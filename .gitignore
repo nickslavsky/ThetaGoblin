@@ -171,4 +171,4 @@ pyrightconfig.json
 
 # ThetaGoblin specific
 staticfiles/
-data/
+data/*.csv
