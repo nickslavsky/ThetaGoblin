@@ -1,0 +1,73 @@
+{% extends "screener/base.html" %}
+
+{% block title %}ThetaGoblin — CSP Candidates{% endblock %}
+
+{% block content %}
+<div class="header-bar">
+    <div>
+        <h1 style="margin:0;">ThetaGoblin</h1>
+        <small>CSP Candidates — {{ candidate_count }} ticker{{ candidate_count|pluralize }}</small>
+    </div>
+    <div>
+        {% if last_snapshot %}
+            <small style="color: var(--pico-muted-color);">Last snapshot: {{ last_snapshot.snapshot_date }}</small>
+        {% endif %}
+        <form method="post" action="{% url 'refresh_candidates' %}" style="display:inline; margin-left: 1rem;">
+            {% csrf_token %}
+            <button type="submit" class="secondary" style="margin:0;">&#8635; Refresh</button>
+        </form>
+    </div>
+</div>
+
+{% if candidates %}
+    {% for candidate in candidates %}
+    <div class="candidate-card">
+        <div class="candidate-header">
+            <h3>{{ candidate.symbol.ticker }}</h3>
+            <span style="font-weight: 500; margin-left: 0.5rem;">{{ candidate.symbol.name }}</span>
+            <span class="spot-price">Spot: ${{ candidate.spot }}</span>
+        </div>
+
+        <div style="overflow-x: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Expiry</th>
+                        <th>DTE</th>
+                        <th>Strike</th>
+                        <th>OTM %</th>
+                        <th>Bid</th>
+                        <th>Ask</th>
+                        <th>Delta</th>
+                        <th>IV %</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for opt in candidate.options %}
+                    <tr>
+                        <td>{{ opt.expiry }}</td>
+                        <td>{{ opt.dte }}</td>
+                        <td>${{ opt.strike }}</td>
+                        <td class="otm-pct">{{ opt.otm_pct }}%</td>
+                        <td>{% if opt.bid %}${{ opt.bid }}{% else %}&mdash;{% endif %}</td>
+                        <td>{% if opt.ask %}${{ opt.ask }}{% else %}&mdash;{% endif %}</td>
+                        <td>{{ opt.delta }}</td>
+                        <td>{% if opt.iv %}{{ opt.iv }}%{% else %}&mdash;{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="no-candidates">
+        <h2>No candidates found</h2>
+        <p>Run the pipeline to load data, or check your FilterConfig thresholds.</p>
+        <p>
+            <a href="/admin/screener/filterconfig/">Edit FilterConfig</a> &middot;
+            <code>docker compose exec web python manage.py run_fundamentals_pipeline</code>
+        </p>
+    </div>
+{% endif %}
+{% endblock %}

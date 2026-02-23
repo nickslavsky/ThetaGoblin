@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}ThetaGoblin{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+        body { padding: 1rem 2rem; }
+        .header-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; border-bottom: 1px solid var(--pico-muted-border-color); padding-bottom: 1rem; }
+        .candidate-card { margin-bottom: 2rem; padding: 1rem 1.5rem; border: 1px solid var(--pico-muted-border-color); border-radius: var(--pico-border-radius); }
+        .candidate-header { margin-bottom: 0.5rem; }
+        .candidate-header h3 { margin: 0; display: inline; }
+        .spot-price { margin-left: 1rem; color: var(--pico-muted-color); }
+        table { margin-top: 0.5rem; font-size: 0.9rem; }
+        .otm-pct { color: var(--pico-muted-color); }
+        .no-candidates { text-align: center; padding: 3rem; color: var(--pico-muted-color); }
+    </style>
+</head>
+<body>
+    <main class="container-fluid">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>
