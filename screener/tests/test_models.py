@@ -78,7 +78,7 @@ class FilterConfigModelTest(TestCase):
         self.assertFalse(fc.typed_value)
 
     def test_get_value_classmethod(self):
-        FilterConfig.objects.create(key="market_cap_min", value="10000000000", value_type="int")
+        # market_cap_min is now seeded by migration; just read it directly
         val = FilterConfig.get_value("market_cap_min")
         self.assertEqual(val, 10_000_000_000)
 
