@@ -14,6 +14,8 @@ def candidates_view(request):
     cfg = {fc.key: fc.typed_value for fc in FilterConfig.objects.all()}
     delta_min = cfg.get("delta_target_min", 0.15)
     delta_max = cfg.get("delta_target_max", 0.30)
+    otm_min = cfg.get("otm_pct_min", 0.15)
+    otm_max = cfg.get("otm_pct_max", 0.20)
 
     qualifying_symbols = get_qualifying_symbols()
 
@@ -36,6 +38,8 @@ def candidates_view(request):
         options_data = []
         for snap in snapshots:
             otm_pct = (float(spot) - float(snap.strike)) / float(spot) * 100
+            if not (otm_min * 100 <= otm_pct <= otm_max * 100):
+                continue
             options_data.append(
                 {
                     "expiry": snap.expiry_date,
@@ -52,6 +56,9 @@ def candidates_view(request):
                     ),
                 }
             )
+
+        if not options_data:
+            continue
 
         candidates.append(
             {

@@ -66,3 +66,57 @@ class CandidatesViewTest(TestCase):
         # GET on refresh should also redirect (not 405)
         resp = self.client.get("/candidates/refresh/")
         self.assertEqual(resp.status_code, 302)
+
+    def test_candidates_excludes_ticker_with_only_too_close_strike(self):
+        """Symbol whose only option is < 15% OTM should not appear as a candidate."""
+        today = date.today()
+        tsla = Symbol.objects.create(
+            ticker="TSLA", exchange_mic="XNAS", name="Tesla Inc",
+            market_cap=1_000_000_000_000,
+            operating_margin=0.10,
+            cash_flow_per_share_annual=3.0,
+            long_term_debt_to_equity_annual=0.5,
+            ten_day_avg_trading_volume=5_000_000,
+        )
+        # strike=220, spot=230 → OTM=4.3%, below otm_pct_min=15%
+        OptionsSnapshot.objects.create(
+            symbol=tsla,
+            snapshot_date=today,
+            expiry_date=today + timedelta(days=35),
+            dte_at_snapshot=35,
+            strike="220.00",
+            spot_price="230.00",
+            implied_volatility=0.28,
+            bid="1.00",
+            ask="1.20",
+            delta=-0.22,
+        )
+        resp = self.client.get("/candidates/")
+        self.assertNotContains(resp, "TSLA")
+
+    def test_candidates_excludes_ticker_with_only_too_far_strike(self):
+        """Symbol whose only option is > 20% OTM should not appear as a candidate."""
+        today = date.today()
+        meta = Symbol.objects.create(
+            ticker="META", exchange_mic="XNAS", name="Meta Platforms",
+            market_cap=1_400_000_000_000,
+            operating_margin=0.35,
+            cash_flow_per_share_annual=12.0,
+            long_term_debt_to_equity_annual=0.3,
+            ten_day_avg_trading_volume=5_000_000,
+        )
+        # strike=160, spot=230 → OTM=30.4%, above otm_pct_max=20%
+        OptionsSnapshot.objects.create(
+            symbol=meta,
+            snapshot_date=today,
+            expiry_date=today + timedelta(days=35),
+            dte_at_snapshot=35,
+            strike="160.00",
+            spot_price="230.00",
+            implied_volatility=0.28,
+            bid="0.50",
+            ask="0.70",
+            delta=-0.22,
+        )
+        resp = self.client.get("/candidates/")
+        self.assertNotContains(resp, "META")
