@@ -409,7 +409,7 @@ git commit -m "feat: seed FilterConfig with 16 default threshold values"
 
 **Files:**
 - Create: `scripts/build_universe.py`
-- Create: `scripts/.env` (symlink or note to use root `.env`)
+-  use root `.env`
 - Create: `screener/management/__init__.py`
 - Create: `screener/management/commands/__init__.py`
 - Create: `screener/management/commands/load_symbols.py`
@@ -417,11 +417,41 @@ git commit -m "feat: seed FilterConfig with 16 default threshold values"
 
 ### Step 1: Create `scripts/build_universe.py`
 
-Standalone script (not Django). Loads `FINNHUB_TOKEN` from `.env` in the project root.
+Standalone script (not Django). Uses `python-dotenv` to load `FINNHUB_TOKEN` from the `.env` file in the project root (`../env` relative to `scripts/`). The token **must be included as a query parameter in every Finnhub API call**.
+
+**Token loading pattern (at top of script):**
+```python
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load .env from project root (one level up from scripts/)
+load_dotenv(Path(__file__).parent.parent / ".env")
+
+FINNHUB_TOKEN = os.environ["FINNHUB_TOKEN"]  # raises KeyError if missing
+BASE_URL = "https://finnhub.io/api/v1"
+```
+
+**Every request must include token in params:**
+```python
+# Symbols endpoint
+resp = requests.get(
+    f"{BASE_URL}/stock/symbol",
+    params={"exchange": "US", "mic": mic, "token": FINNHUB_TOKEN},
+    timeout=10,
+)
+
+# Fundamentals endpoint
+resp = requests.get(
+    f"{BASE_URL}/stock/metric",
+    params={"symbol": ticker, "metric": "all", "token": FINNHUB_TOKEN},
+    timeout=10,
+)
+```
 
 **Key behavior:**
-- Calls `GET /api/v1/stock/symbol?exchange=US&mic=XNAS` and `&mic=XNYS`
-- For the first 100 symbols from each exchange, calls `GET /api/v1/stock/metric?symbol={ticker}&metric=all`
+- Calls `GET /api/v1/stock/symbol?exchange=US&mic=XNAS&token=...` and `&mic=XNYS&token=...`
+- For the first 100 symbols from each exchange, calls `GET /api/v1/stock/metric?symbol={ticker}&metric=all&token=...`
 - **Rate limiting:** 1-second delay (`time.sleep(1.0)`) between each fundamentals call. This stays well under Finnhub's 60 calls/min free tier limit.
 - **Error handling:** try/except around each API call, log and skip on failure, continue to next symbol.
 - Extracts from the `metric` response: `marketCapitalization` (Finnhub returns in millions — multiply by 1,000,000), `operatingMarginAnnual`, `cashFlowPerShareAnnual`, `10DayAverageTradingVolume`, `longTermDebt/equityAnnual`
@@ -435,12 +465,14 @@ Standalone script (not Django). Loads `FINNHUB_TOKEN` from `.env` in the project
 ```python
 data = response.json()
 metrics = data.get("metric", {})
-market_cap = metrics.get("marketCapitalization")  # in millions
+market_cap = metrics.get("marketCapitalization")  # in millions — multiply by 1_000_000
 operating_margin = metrics.get("operatingMarginAnnual")
 cash_flow = metrics.get("cashFlowPerShareAnnual")
 volume_10d = metrics.get("10DayAverageTradingVolume")
 debt_equity = metrics.get("longTermDebt/equityAnnual")
 ```
+
+**Symbol name** comes from the symbols endpoint response field `description` (not `name`).
 
 ### Step 2: Write test for load_symbols command
 
