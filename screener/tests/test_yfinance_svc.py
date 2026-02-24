@@ -45,3 +45,23 @@ class YfinanceSvcTest(TestCase):
         mock_ticker_cls.side_effect = Exception("network error")
         result = yfinance_svc.get_puts_chain("AAPL", "2026-03-21")
         self.assertIsNone(result)
+
+    @patch("screener.services.yfinance_svc.yf.Ticker")
+    def test_get_puts_chain_handles_nan_volume_and_open_interest(self, mock_ticker_cls):
+        """yfinance returns NaN for volume/openInterest on illiquid strikes — must not crash."""
+        mock_ticker = MagicMock()
+        mock_ticker.info = {"currentPrice": 50.0}
+        puts_df = pd.DataFrame([
+            {"strike": 45.0, "bid": 0.10, "ask": 0.15,
+             "impliedVolatility": 0.35, "openInterest": float("nan"), "volume": float("nan")},
+        ])
+        mock_chain = MagicMock()
+        mock_chain.puts = puts_df
+        mock_ticker.option_chain.return_value = mock_chain
+        mock_ticker_cls.return_value = mock_ticker
+
+        result = yfinance_svc.get_puts_chain("AA", "2026-03-27")
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["volume"], 0)
+        self.assertEqual(result[0]["open_interest"], 0)

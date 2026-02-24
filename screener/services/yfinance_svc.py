@@ -1,7 +1,31 @@
 import logging
+import math
+
 import yfinance as yf
 
 logger = logging.getLogger(__name__)
+
+
+def _safe_float(val, default: float = 0.0) -> float:
+    """Cast to float, treating None and NaN as default."""
+    if val is None:
+        return default
+    try:
+        f = float(val)
+        return default if math.isnan(f) else f
+    except (TypeError, ValueError):
+        return default
+
+
+def _safe_int(val, default: int = 0) -> int:
+    """Cast to int, treating None and NaN as default."""
+    if val is None:
+        return default
+    try:
+        f = float(val)
+        return default if math.isnan(f) else int(f)
+    except (TypeError, ValueError):
+        return default
 
 
 def get_expiry_dates(ticker: str) -> list[str]:
@@ -25,12 +49,12 @@ def get_puts_chain(ticker: str, expiry: str) -> list[dict] | None:
         rows = []
         for _, row in chain.puts.iterrows():
             rows.append({
-                "strike": float(row["strike"]),
-                "bid": float(row.get("bid") or 0),
-                "ask": float(row.get("ask") or 0),
-                "implied_volatility": float(row.get("impliedVolatility") or 0),
-                "open_interest": int(row.get("openInterest") or 0),
-                "volume": int(row.get("volume") or 0),
+                "strike": _safe_float(row.get("strike")),
+                "bid": _safe_float(row.get("bid")),
+                "ask": _safe_float(row.get("ask")),
+                "implied_volatility": _safe_float(row.get("impliedVolatility")),
+                "open_interest": _safe_int(row.get("openInterest")),
+                "volume": _safe_int(row.get("volume")),
                 "spot_price": spot,
             })
         return rows
