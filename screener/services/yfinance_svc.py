@@ -1,7 +1,16 @@
 import logging
 import math
+import warnings
 
 import yfinance as yf
+
+# yfinance uses Timestamp.utcnow() internally, which is deprecated in pandas 2.x.
+# This is a third-party issue we cannot fix — suppress to avoid log flooding.
+warnings.filterwarnings(
+    "ignore",
+    message="Timestamp.utcnow is deprecated",
+    module="yfinance",
+)
 
 logger = logging.getLogger(__name__)
 
