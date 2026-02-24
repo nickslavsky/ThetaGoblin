@@ -66,6 +66,19 @@ class IVRank(models.Model):
         ordering = ["-computed_date"]
 
 
+class IV30Snapshot(models.Model):
+    symbol = models.ForeignKey(Symbol, on_delete=models.CASCADE, related_name="iv30_snapshots")
+    date = models.DateField()
+    iv30 = models.FloatField(help_text="30-day implied volatility (decimal, e.g. 0.28)")
+
+    class Meta:
+        unique_together = ["symbol", "date"]
+        ordering = ["-date"]
+
+    def __str__(self):
+        return f"{self.symbol.ticker} {self.date} IV30={self.iv30}"
+
+
 class FilterConfig(models.Model):
     VALUE_TYPES = [
         ("int", "Integer"),

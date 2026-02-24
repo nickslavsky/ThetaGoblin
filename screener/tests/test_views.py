@@ -1,7 +1,8 @@
 from datetime import date, timedelta
+from unittest.mock import patch
 from django.test import TestCase, Client
 from django.urls import reverse
-from screener.models import Symbol, OptionsSnapshot, FilterConfig
+from screener.models import Symbol, OptionsSnapshot, IVRank, FilterConfig
 
 
 class CandidatesViewTest(TestCase):
@@ -58,15 +59,6 @@ class CandidatesViewTest(TestCase):
         self.assertIn(resp.status_code, [301, 302])
         self.assertIn("/candidates/", resp["Location"])
 
-    def test_refresh_post_returns_redirect(self):
-        resp = self.client.post("/candidates/refresh/")
-        self.assertEqual(resp.status_code, 302)
-
-    def test_refresh_get_returns_redirect(self):
-        # GET on refresh should also redirect (not 405)
-        resp = self.client.get("/candidates/refresh/")
-        self.assertEqual(resp.status_code, 302)
-
     def test_candidates_excludes_ticker_with_only_too_close_strike(self):
         """Symbol whose only option is < 15% OTM should not appear as a candidate."""
         today = date.today()
@@ -120,3 +112,70 @@ class CandidatesViewTest(TestCase):
         )
         resp = self.client.get("/candidates/")
         self.assertNotContains(resp, "META")
+
+    def test_candidates_shows_iv_rank(self):
+        """IV rank badge should appear when IVRank exists."""
+        IVRank.objects.create(
+            symbol=self.aapl, computed_date=date.today(),
+            iv_rank=75.0, iv_percentile=65.0,
+            weeks_of_history=30, is_reliable=False,
+        )
+        resp = self.client.get("/candidates/")
+        self.assertContains(resp, "IVR: 75.0")
+
+    def test_candidates_filters_reliable_rank_outside_range(self):
+        """Symbol with reliable IV rank outside [70, 90] should be excluded."""
+        IVRank.objects.create(
+            symbol=self.aapl, computed_date=date.today(),
+            iv_rank=50.0, iv_percentile=40.0,
+            weeks_of_history=52, is_reliable=True,
+        )
+        resp = self.client.get("/candidates/")
+        self.assertNotContains(resp, "AAPL")
+
+    def test_candidates_keeps_unreliable_rank(self):
+        """Symbol with unreliable IV rank outside range should still appear."""
+        IVRank.objects.create(
+            symbol=self.aapl, computed_date=date.today(),
+            iv_rank=50.0, iv_percentile=40.0,
+            weeks_of_history=10, is_reliable=False,
+        )
+        resp = self.client.get("/candidates/")
+        self.assertContains(resp, "AAPL")
+
+
+class RefreshCandidatesViewTest(TestCase):
+
+    def setUp(self):
+        self.client = Client()
+        self.aapl = Symbol.objects.create(
+            ticker="AAPL", exchange_mic="XNAS", name="Apple Inc",
+            market_cap=3_000_000_000_000,
+            operating_margin=0.30,
+            cash_flow_per_share_annual=7.5,
+            long_term_debt_to_equity_annual=1.2,
+            ten_day_avg_trading_volume=5_000_000,
+        )
+
+    @patch("screener.views.fetch_live_options")
+    def test_refresh_renders_directly(self, mock_fetch):
+        """Refresh should render the template directly, not redirect."""
+        mock_fetch.return_value = []
+        resp = self.client.post("/candidates/refresh/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Live data")
+
+    @patch("screener.views.fetch_live_options")
+    def test_refresh_does_not_persist_options(self, mock_fetch):
+        """After refresh, OptionsSnapshot count should be unchanged."""
+        initial_count = OptionsSnapshot.objects.count()
+        mock_fetch.return_value = []
+        self.client.post("/candidates/refresh/")
+        self.assertEqual(OptionsSnapshot.objects.count(), initial_count)
+
+    @patch("screener.views.fetch_live_options")
+    def test_refresh_get_also_works(self, mock_fetch):
+        """GET on refresh should also work (render live data)."""
+        mock_fetch.return_value = []
+        resp = self.client.get("/candidates/refresh/")
+        self.assertEqual(resp.status_code, 200)

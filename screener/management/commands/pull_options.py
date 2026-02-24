@@ -4,7 +4,7 @@ from datetime import date
 
 from django.core.management.base import BaseCommand
 
-from screener.models import FilterConfig, OptionsSnapshot
+from screener.models import FilterConfig, IV30Snapshot, OptionsSnapshot
 from screener.services import yfinance_svc
 from screener.services.candidates import get_qualifying_symbols
 from screener.services.options_math import compute_put_delta
@@ -50,6 +50,7 @@ class Command(BaseCommand):
                 skipped_symbols += 1
                 continue
 
+            ticker_info = {}
             for expiry_str in expiries:
                 try:
                     expiry = date.fromisoformat(expiry_str)
@@ -60,7 +61,7 @@ class Command(BaseCommand):
                 if dte < dte_min or dte > dte_max:
                     continue
 
-                puts = yfinance_svc.get_puts_chain(sym.ticker, expiry_str)
+                puts = yfinance_svc.get_puts_chain(sym.ticker, expiry_str, ticker_info=ticker_info)
                 if puts is None:
                     continue
 
@@ -105,6 +106,14 @@ class Command(BaseCommand):
 
                 if delay > 0:
                     time.sleep(delay)
+
+            # Store IV30 snapshot (one per symbol per run)
+            iv30_val = ticker_info.get("iv30")
+            if iv30_val is not None:
+                IV30Snapshot.objects.update_or_create(
+                    symbol=sym, date=today,
+                    defaults={"iv30": iv30_val},
+                )
 
         self.stdout.write(
             self.style.SUCCESS(

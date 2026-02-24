@@ -8,4 +8,5 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.stdout.write("=== Starting options pipeline ===")
         call_command("pull_options", stdout=self.stdout, stderr=self.stderr)
+        call_command("compute_iv_rank", stdout=self.stdout, stderr=self.stderr)
         self.stdout.write("=== Options pipeline complete ===")

@@ -2,7 +2,7 @@ from datetime import date, timedelta
 from unittest.mock import patch
 from django.test import TestCase
 from django.core.management import call_command
-from screener.models import Symbol, OptionsSnapshot
+from screener.models import Symbol, IV30Snapshot, OptionsSnapshot
 
 
 class PullOptionsTest(TestCase):
@@ -48,3 +48,48 @@ class PullOptionsTest(TestCase):
         mock_chain.return_value = None
         call_command("pull_options", delay=0)
         self.assertEqual(OptionsSnapshot.objects.count(), 0)
+
+    @patch("screener.management.commands.pull_options.yfinance_svc.get_expiry_dates")
+    @patch("screener.management.commands.pull_options.yfinance_svc.get_puts_chain")
+    def test_stores_iv30_snapshot(self, mock_chain, mock_expiries):
+        today = date.today()
+        expiry = today + timedelta(days=35)
+        mock_expiries.return_value = [expiry.isoformat()]
+
+        def chain_with_iv30(ticker, expiry_str, *, ticker_info=None):
+            if ticker_info is not None:
+                ticker_info["iv30"] = 0.32
+                ticker_info["spot_price"] = 230.0
+            return [{
+                "strike": 215.0, "bid": 2.50, "ask": 2.70,
+                "implied_volatility": 0.28, "open_interest": 500,
+                "volume": 120, "spot_price": 230.0,
+            }]
+
+        mock_chain.side_effect = chain_with_iv30
+        call_command("pull_options", delay=0)
+        self.assertEqual(IV30Snapshot.objects.count(), 1)
+        snap = IV30Snapshot.objects.first()
+        self.assertAlmostEqual(snap.iv30, 0.32)
+        self.assertEqual(snap.symbol, self.sym)
+
+    @patch("screener.management.commands.pull_options.yfinance_svc.get_expiry_dates")
+    @patch("screener.management.commands.pull_options.yfinance_svc.get_puts_chain")
+    def test_skips_iv30_when_none(self, mock_chain, mock_expiries):
+        today = date.today()
+        expiry = today + timedelta(days=35)
+        mock_expiries.return_value = [expiry.isoformat()]
+
+        def chain_no_iv30(ticker, expiry_str, *, ticker_info=None):
+            if ticker_info is not None:
+                ticker_info["iv30"] = None
+                ticker_info["spot_price"] = 230.0
+            return [{
+                "strike": 215.0, "bid": 2.50, "ask": 2.70,
+                "implied_volatility": 0.28, "open_interest": 500,
+                "volume": 120, "spot_price": 230.0,
+            }]
+
+        mock_chain.side_effect = chain_no_iv30
+        call_command("pull_options", delay=0)
+        self.assertEqual(IV30Snapshot.objects.count(), 0)

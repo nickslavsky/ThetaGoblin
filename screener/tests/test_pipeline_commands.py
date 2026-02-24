@@ -27,3 +27,10 @@ class RunOptionsPipelineTest(TestCase):
         call_command("run_options_pipeline")
         calls = [c[0][0] for c in mock_call.call_args_list]
         self.assertIn("pull_options", calls)
+
+    @patch("screener.management.commands.run_options_pipeline.call_command")
+    def test_calls_compute_iv_rank_after_pull_options(self, mock_call):
+        call_command("run_options_pipeline")
+        calls = [c[0][0] for c in mock_call.call_args_list]
+        self.assertIn("compute_iv_rank", calls)
+        self.assertLess(calls.index("pull_options"), calls.index("compute_iv_rank"))

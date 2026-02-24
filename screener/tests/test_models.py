@@ -1,6 +1,6 @@
 from django.test import TestCase
 from django.db import IntegrityError
-from screener.models import Symbol, EarningsDate, OptionsSnapshot, IVRank, FilterConfig
+from screener.models import Symbol, EarningsDate, OptionsSnapshot, IVRank, IV30Snapshot, FilterConfig
 
 
 class SymbolModelTest(TestCase):
@@ -53,6 +53,30 @@ class IVRankModelTest(TestCase):
         IVRank.objects.create(symbol=self.sym, computed_date=date(2026, 2, 23), iv_rank=75.0)
         self.sym.delete()
         self.assertEqual(IVRank.objects.count(), 0)
+
+
+class IV30SnapshotModelTest(TestCase):
+    def setUp(self):
+        self.sym = Symbol.objects.create(ticker="AAPL", exchange_mic="XNAS", name="Apple Inc")
+
+    def test_create_and_str(self):
+        from datetime import date
+        snap = IV30Snapshot.objects.create(symbol=self.sym, date=date(2026, 2, 23), iv30=0.28)
+        self.assertIn("AAPL", str(snap))
+        self.assertIn("0.28", str(snap))
+
+    def test_unique_together(self):
+        from datetime import date
+        IV30Snapshot.objects.create(symbol=self.sym, date=date(2026, 2, 23), iv30=0.28)
+        with self.assertRaises(Exception):
+            IV30Snapshot.objects.create(symbol=self.sym, date=date(2026, 2, 23), iv30=0.30)
+
+    def test_fk_cascade_delete(self):
+        from datetime import date
+        IV30Snapshot.objects.create(symbol=self.sym, date=date(2026, 2, 23), iv30=0.28)
+        self.assertEqual(IV30Snapshot.objects.count(), 1)
+        self.sym.delete()
+        self.assertEqual(IV30Snapshot.objects.count(), 0)
 
 
 class FilterConfigModelTest(TestCase):

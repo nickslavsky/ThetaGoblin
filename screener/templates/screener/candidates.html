@@ -7,9 +7,12 @@
     <div>
         <h1 style="margin:0;">ThetaGoblin</h1>
         <small>CSP Candidates — {{ candidate_count }} ticker{{ candidate_count|pluralize }}</small>
+        {% if is_live %}
+            <span style="display:inline-block; background:var(--pico-primary-background); color:var(--pico-primary-inverse); padding:0.1rem 0.5rem; border-radius:4px; font-size:0.75rem; margin-left:0.5rem; vertical-align:middle;">Live data</span>
+        {% endif %}
     </div>
     <div>
-        {% if last_snapshot %}
+        {% if last_snapshot and not is_live %}
             <small style="color: var(--pico-muted-color);">Last snapshot: {{ last_snapshot.snapshot_date }}</small>
         {% endif %}
         <form method="post" action="{% url 'refresh_candidates' %}" style="display:inline; margin-left: 1rem;">
@@ -26,6 +29,11 @@
             <h3>{{ candidate.symbol.ticker }}</h3>
             <span style="font-weight: 500; margin-left: 0.5rem;">{{ candidate.symbol.name }}</span>
             <span class="spot-price">Spot: ${{ candidate.spot }}</span>
+            {% if candidate.iv_rank is not None %}
+                <span style="display:inline-block; background:#e8e8e8; padding:0.1rem 0.5rem; border-radius:4px; font-size:0.8rem; margin-left:0.5rem;">
+                    IVR: {{ candidate.iv_rank }}{% if candidate.iv_rank_reliable == False %}*{% endif %}
+                </span>
+            {% endif %}
         </div>
 
         <div style="overflow-x: auto;">

@@ -1,11 +1,11 @@
 import logging
 from datetime import date
 
-from django.core.management import call_command
 from django.shortcuts import redirect, render
 
-from screener.models import FilterConfig, OptionsSnapshot
+from screener.models import FilterConfig, IVRank, OptionsSnapshot
 from screener.services.candidates import get_qualifying_symbols
+from screener.services.live_options import fetch_live_options
 
 logger = logging.getLogger(__name__)
 
@@ -16,11 +16,26 @@ def candidates_view(request):
     delta_max = cfg.get("delta_target_max", 0.30)
     otm_min = cfg.get("otm_pct_min", 0.15)
     otm_max = cfg.get("otm_pct_max", 0.20)
+    iv_rank_min = cfg.get("iv_rank_min", 70)
+    iv_rank_max = cfg.get("iv_rank_max", 90)
 
     qualifying_symbols = get_qualifying_symbols()
 
+    # Prefetch latest IVRank per qualifying symbol
+    iv_ranks = {}
+    for sym in qualifying_symbols:
+        latest = IVRank.objects.filter(symbol=sym).order_by("-computed_date").first()
+        if latest:
+            iv_ranks[sym.pk] = latest
+
     candidates = []
     for sym in qualifying_symbols:
+        # Apply IV rank filter: only filter when reliable
+        rank_obj = iv_ranks.get(sym.pk)
+        if rank_obj and rank_obj.is_reliable:
+            if rank_obj.iv_rank < iv_rank_min or rank_obj.iv_rank > iv_rank_max:
+                continue
+
         snapshots = (
             OptionsSnapshot.objects.filter(
                 symbol=sym,
@@ -60,11 +75,20 @@ def candidates_view(request):
         if not options_data:
             continue
 
+        # Build IV rank display info
+        iv_rank_display = None
+        iv_rank_reliable = None
+        if rank_obj:
+            iv_rank_display = round(rank_obj.iv_rank, 1)
+            iv_rank_reliable = rank_obj.is_reliable
+
         candidates.append(
             {
                 "symbol": sym,
                 "spot": spot,
                 "options": options_data,
+                "iv_rank": iv_rank_display,
+                "iv_rank_reliable": iv_rank_reliable,
             }
         )
 
@@ -77,14 +101,28 @@ def candidates_view(request):
             "candidates": candidates,
             "last_snapshot": last_snapshot,
             "candidate_count": len(candidates),
+            "is_live": False,
         },
     )
 
 
 def refresh_candidates(request):
-    """Trigger a live options pull for currently qualifying symbols."""
+    """Fetch live options for display only — no DB writes."""
+    cfg = {fc.key: fc.typed_value for fc in FilterConfig.objects.all()}
+    qualifying_symbols = get_qualifying_symbols()
+
     try:
-        call_command("pull_options", limit=50, delay=0.5)
+        candidates = fetch_live_options(qualifying_symbols, cfg)
     except Exception:
         logger.exception("Refresh failed")
-    return redirect("candidates")
+        candidates = []
+
+    return render(
+        request,
+        "screener/candidates.html",
+        {
+            "candidates": candidates,
+            "candidate_count": len(candidates),
+            "is_live": True,
+        },
+    )
