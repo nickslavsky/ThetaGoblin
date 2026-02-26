@@ -18,6 +18,7 @@ def candidates_view(request):
     otm_max = cfg.get("otm_pct_max", 0.20)
     iv_rank_min = cfg.get("iv_rank_min", 70)
     iv_rank_max = cfg.get("iv_rank_max", 90)
+    min_notional_oi = cfg.get("min_notional_oi", 10_000_000)
 
     qualifying_symbols = get_qualifying_symbols()
     logger.debug("View funnel: %d qualifying symbols from fundamentals+earnings filter", len(qualifying_symbols))
@@ -34,6 +35,7 @@ def candidates_view(request):
     filtered_by_iv_rank = 0
     filtered_no_snapshots = 0
     filtered_no_otm_match = 0
+    filtered_low_notional_oi = 0
     for sym in qualifying_symbols:
         # Apply IV rank filter: only filter when reliable
         rank_obj = iv_ranks.get(sym.pk)
@@ -58,6 +60,7 @@ def candidates_view(request):
 
         spot = snapshots.first().spot_price
         options_data = []
+        oi_strike_pairs = []
         for snap in snapshots:
             otm_pct = (float(spot) - float(snap.strike)) / float(spot) * 100
             if not (otm_min * 100 <= otm_pct <= otm_max * 100):
@@ -78,9 +81,19 @@ def candidates_view(request):
                     ),
                 }
             )
+            oi_strike_pairs.append((snap.open_interest or 0, float(snap.strike)))
 
         if not options_data:
             filtered_no_otm_match += 1
+            continue
+
+        # Compute notional OI: avg(open_interest) x avg(strike) across qualifying strikes
+        avg_oi = sum(oi for oi, _ in oi_strike_pairs) / len(oi_strike_pairs)
+        avg_strike = sum(s for _, s in oi_strike_pairs) / len(oi_strike_pairs)
+        notional_oi = avg_oi * avg_strike
+
+        if notional_oi < min_notional_oi:
+            filtered_low_notional_oi += 1
             continue
 
         # Build IV rank display info
@@ -97,15 +110,17 @@ def candidates_view(request):
                 "options": options_data,
                 "iv_rank": iv_rank_display,
                 "iv_rank_reliable": iv_rank_reliable,
+                "notional_oi": f"${notional_oi:,.0f}",
             }
         )
 
     logger.debug(
         "View funnel: %d filtered by IV rank (%s-%s), %d no option snapshots in delta range, "
-        "%d no strikes in OTM range (%s%%-%s%%) → %d final candidates",
+        "%d no strikes in OTM range (%s%%-%s%%), %d low notional OI (<%s) → %d final candidates",
         filtered_by_iv_rank, iv_rank_min, iv_rank_max,
         filtered_no_snapshots,
         filtered_no_otm_match, otm_min * 100, otm_max * 100,
+        filtered_low_notional_oi, f"${min_notional_oi:,.0f}",
         len(candidates),
     )
 

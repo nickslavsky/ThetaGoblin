@@ -34,6 +34,11 @@
                     IVR: {{ candidate.iv_rank }}{% if candidate.iv_rank_reliable == False %}*{% endif %}
                 </span>
             {% endif %}
+            {% if candidate.notional_oi %}
+                <span class="badge" style="display:inline-block; background:#e8e8e8; padding:0.1rem 0.5rem; border-radius:4px; font-size:0.8rem; margin-left:0.5rem;" title="Notional Open Interest (avg OI x avg strike)">
+                    NOI: {{ candidate.notional_oi }}
+                </span>
+            {% endif %}
         </div>
 
         <div style="overflow-x: auto;">

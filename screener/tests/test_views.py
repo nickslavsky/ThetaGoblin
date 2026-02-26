@@ -42,6 +42,13 @@ class CandidatesViewTest(TestCase):
             delta=-0.22,  # in display band
         )
 
+        # Disable notional OI filter by default so existing tests aren't affected
+        FilterConfig.objects.update_or_create(
+            key="min_notional_oi",
+            defaults={"value": "0", "value_type": "int",
+                      "description": "Minimum notional open interest"},
+        )
+
     def test_candidates_page_loads(self):
         resp = self.client.get("/candidates/")
         self.assertEqual(resp.status_code, 200)
@@ -142,6 +149,30 @@ class CandidatesViewTest(TestCase):
         )
         resp = self.client.get("/candidates/")
         self.assertContains(resp, "AAPL")
+
+
+    def test_candidate_excluded_by_low_notional_oi(self):
+        """Symbol with no open interest should be excluded when threshold is set."""
+        FilterConfig.objects.filter(key="min_notional_oi").update(value="10000000")
+        # AAPL snapshot has open_interest=None → notional_oi=0, below $10M
+        resp = self.client.get("/candidates/")
+        self.assertNotContains(resp, "AAPL")
+
+    def test_candidate_included_with_sufficient_notional_oi(self):
+        """Symbol with enough OI should pass the notional OI filter."""
+        FilterConfig.objects.filter(key="min_notional_oi").update(value="10000000")
+        # Update AAPL snapshot with high open interest: 60000 * 195 = $11.7M > $10M
+        self.snap.open_interest = 60000
+        self.snap.save()
+        resp = self.client.get("/candidates/")
+        self.assertContains(resp, "AAPL")
+
+    def test_notional_oi_displayed(self):
+        """NOI badge should render when notional_oi is present."""
+        self.snap.open_interest = 60000
+        self.snap.save()
+        resp = self.client.get("/candidates/")
+        self.assertContains(resp, "NOI:")
 
 
 class RefreshCandidatesViewTest(TestCase):

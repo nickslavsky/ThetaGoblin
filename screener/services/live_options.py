@@ -20,6 +20,7 @@ def fetch_live_options(symbols, cfg: dict) -> list[dict]:
     delta_max = cfg.get("delta_target_max", 0.30)
     otm_min = cfg.get("otm_pct_min", 0.15)
     otm_max = cfg.get("otm_pct_max", 0.20)
+    min_notional_oi = cfg.get("min_notional_oi", 10_000_000)
 
     today = date.today()
     candidates = []
@@ -35,6 +36,7 @@ def fetch_live_options(symbols, cfg: dict) -> list[dict]:
             continue
 
         options_data = []
+        oi_strike_pairs = []
         spot = None
 
         for expiry_str in expiries:
@@ -84,12 +86,22 @@ def fetch_live_options(symbols, cfg: dict) -> list[dict]:
                     "delta": round(delta, 3),
                     "iv": round(vol * 100, 1) if vol else None,
                 })
+                oi_strike_pairs.append((put.get("open_interest") or 0, float(strike)))
 
         if options_data and spot is not None:
+            # Compute notional OI: avg(open_interest) x avg(strike)
+            avg_oi = sum(oi for oi, _ in oi_strike_pairs) / len(oi_strike_pairs)
+            avg_strike = sum(s for _, s in oi_strike_pairs) / len(oi_strike_pairs)
+            notional_oi = avg_oi * avg_strike
+
+            if notional_oi < min_notional_oi:
+                continue
+
             candidates.append({
                 "symbol": sym,
                 "spot": spot,
                 "options": options_data,
+                "notional_oi": f"${notional_oi:,.0f}",
             })
 
     return candidates

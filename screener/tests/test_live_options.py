@@ -24,6 +24,7 @@ class FetchLiveOptionsTest(TestCase):
             "delta_target_max": 0.30,
             "otm_pct_min": 0.15,
             "otm_pct_max": 0.20,
+            "min_notional_oi": 0,
         }
         today = date.today()
         self.expiry = today + timedelta(days=35)
