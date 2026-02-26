@@ -20,6 +20,7 @@ def candidates_view(request):
     iv_rank_max = cfg.get("iv_rank_max", 90)
 
     qualifying_symbols = get_qualifying_symbols()
+    logger.debug("View funnel: %d qualifying symbols from fundamentals+earnings filter", len(qualifying_symbols))
 
     # Prefetch latest IVRank per qualifying symbol
     iv_ranks = {}
@@ -27,13 +28,18 @@ def candidates_view(request):
         latest = IVRank.objects.filter(symbol=sym).order_by("-computed_date").first()
         if latest:
             iv_ranks[sym.pk] = latest
+    logger.debug("View funnel: %d/%d have IV rank data", len(iv_ranks), len(qualifying_symbols))
 
     candidates = []
+    filtered_by_iv_rank = 0
+    filtered_no_snapshots = 0
+    filtered_no_otm_match = 0
     for sym in qualifying_symbols:
         # Apply IV rank filter: only filter when reliable
         rank_obj = iv_ranks.get(sym.pk)
         if rank_obj and rank_obj.is_reliable:
             if rank_obj.iv_rank < iv_rank_min or rank_obj.iv_rank > iv_rank_max:
+                filtered_by_iv_rank += 1
                 continue
 
         snapshots = (
@@ -47,6 +53,7 @@ def candidates_view(request):
         )
 
         if not snapshots.exists():
+            filtered_no_snapshots += 1
             continue
 
         spot = snapshots.first().spot_price
@@ -73,6 +80,7 @@ def candidates_view(request):
             )
 
         if not options_data:
+            filtered_no_otm_match += 1
             continue
 
         # Build IV rank display info
@@ -91,6 +99,15 @@ def candidates_view(request):
                 "iv_rank_reliable": iv_rank_reliable,
             }
         )
+
+    logger.debug(
+        "View funnel: %d filtered by IV rank (%s-%s), %d no option snapshots in delta range, "
+        "%d no strikes in OTM range (%s%%-%s%%) → %d final candidates",
+        filtered_by_iv_rank, iv_rank_min, iv_rank_max,
+        filtered_no_snapshots,
+        filtered_no_otm_match, otm_min * 100, otm_max * 100,
+        len(candidates),
+    )
 
     last_snapshot = OptionsSnapshot.objects.order_by("-snapshot_date").first()
 
