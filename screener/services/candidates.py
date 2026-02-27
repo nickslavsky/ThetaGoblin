@@ -33,6 +33,10 @@ def get_qualifying_symbols() -> list:
     symbols = symbols.filter(long_term_debt_to_equity_annual__lt=cfg["debt_to_equity_max"])
     logger.debug("Candidates funnel: %d pass debt_to_equity < %s", symbols.count(), cfg["debt_to_equity_max"])
 
+    min_avg_volume = cfg.get("min_avg_volume", 1.5)
+    symbols = symbols.filter(ten_day_avg_trading_volume__gte=min_avg_volume)
+    logger.debug("Candidates funnel: %d pass avg_volume >= %sM shares", symbols.count(), min_avg_volume)
+
     today = date.today()
     exclusion_cutoff = today + timedelta(days=cfg["earnings_exclusion_days"])
     tickers_with_upcoming_earnings = set(

@@ -28,7 +28,7 @@ key, value, value_type (int/float/bool), description, updated_at. Seeded with de
 market_cap_min: 10,000,000,000
 operating_margin_min: 0.0
 free_cash_flow_min: 0
-avg_daily_dollar_volume_min: 100,000,000
+avg_daily_dollar_volume_min: 1.5
 debt_to_equity_max: 2.0
 earnings_exclusion_days: 50
 iv_rank_min: 70
