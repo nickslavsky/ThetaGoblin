@@ -8,11 +8,11 @@ class FilterConfigSeedTest(TestCase):
     def test_all_default_keys_exist(self):
         expected_keys = [
             "market_cap_min", "operating_margin_min", "free_cash_flow_min",
-            "avg_daily_dollar_volume_min", "debt_to_equity_max",
+            "min_avg_volume", "debt_to_equity_max",
             "earnings_exclusion_days", "iv_rank_min", "iv_rank_max",
             "iv_min", "iv_max", "delta_target_min", "delta_target_max",
             "otm_pct_target", "expiry_dte_min", "expiry_dte_max",
-            "risk_free_rate",
+            "risk_free_rate", "min_notional_oi",
         ]
         for key in expected_keys:
             self.assertTrue(
