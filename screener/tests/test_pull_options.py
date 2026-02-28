@@ -55,22 +55,19 @@ class PullOptionsTest(TestCase):
         today = date.today()
         expiry = today + timedelta(days=35)
         mock_expiries.return_value = [expiry.isoformat()]
-
-        def chain_with_iv30(ticker, expiry_str, *, ticker_info=None):
-            if ticker_info is not None:
-                ticker_info["iv30"] = 0.32
-                ticker_info["spot_price"] = 230.0
-            return [{
-                "strike": 215.0, "bid": 2.50, "ask": 2.70,
-                "implied_volatility": 0.28, "open_interest": 500,
-                "volume": 120, "spot_price": 230.0,
-            }]
-
-        mock_chain.side_effect = chain_with_iv30
+        # Chain with ATM-bracketing strikes around spot=230
+        mock_chain.return_value = [
+            {"strike": 225.0, "bid": 2.50, "ask": 2.70,
+             "implied_volatility": 0.30, "open_interest": 500,
+             "volume": 120, "spot_price": 230.0},
+            {"strike": 235.0, "bid": 5.00, "ask": 5.30,
+             "implied_volatility": 0.34, "open_interest": 300,
+             "volume": 80, "spot_price": 230.0},
+        ]
         call_command("pull_options", delay=0)
         self.assertEqual(IV30Snapshot.objects.count(), 1)
         snap = IV30Snapshot.objects.first()
-        self.assertAlmostEqual(snap.iv30, 0.32)
+        self.assertAlmostEqual(snap.iv30, 0.32)  # avg of 0.30 and 0.34
         self.assertEqual(snap.symbol, self.sym)
 
     @patch("screener.management.commands.pull_options.yfinance_svc.get_expiry_dates")
@@ -79,17 +76,11 @@ class PullOptionsTest(TestCase):
         today = date.today()
         expiry = today + timedelta(days=35)
         mock_expiries.return_value = [expiry.isoformat()]
-
-        def chain_no_iv30(ticker, expiry_str, *, ticker_info=None):
-            if ticker_info is not None:
-                ticker_info["iv30"] = None
-                ticker_info["spot_price"] = 230.0
-            return [{
-                "strike": 215.0, "bid": 2.50, "ask": 2.70,
-                "implied_volatility": 0.28, "open_interest": 500,
-                "volume": 120, "spot_price": 230.0,
-            }]
-
-        mock_chain.side_effect = chain_no_iv30
+        # Chain with zero IVs → compute_atm_iv returns None → no IV30Snapshot
+        mock_chain.return_value = [
+            {"strike": 225.0, "bid": 2.50, "ask": 2.70,
+             "implied_volatility": 0.0, "open_interest": 500,
+             "volume": 120, "spot_price": 230.0},
+        ]
         call_command("pull_options", delay=0)
         self.assertEqual(IV30Snapshot.objects.count(), 0)

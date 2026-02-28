@@ -7,7 +7,11 @@ from django.core.management.base import BaseCommand
 from screener.models import FilterConfig, IV30Snapshot, OptionsSnapshot
 from screener.services import yfinance_svc
 from screener.services.candidates import get_qualifying_symbols
-from screener.services.options_math import compute_put_delta
+from screener.services.options_math import (
+    compute_atm_iv,
+    compute_put_delta,
+    select_iv30_from_expiries,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +54,7 @@ class Command(BaseCommand):
                 skipped_symbols += 1
                 continue
 
-            ticker_info = {}
+            expiry_ivs = []
             for expiry_str in expiries:
                 try:
                     expiry = date.fromisoformat(expiry_str)
@@ -61,9 +65,16 @@ class Command(BaseCommand):
                 if dte < dte_min or dte > dte_max:
                     continue
 
-                puts = yfinance_svc.get_puts_chain(sym.ticker, expiry_str, ticker_info=ticker_info)
+                puts = yfinance_svc.get_puts_chain(sym.ticker, expiry_str)
                 if puts is None:
                     continue
+
+                # Derive ATM IV from the full chain before filtering
+                spot_for_iv = puts[0].get("spot_price") if puts else None
+                if spot_for_iv and puts:
+                    atm_iv = compute_atm_iv(puts, float(spot_for_iv))
+                    if atm_iv is not None:
+                        expiry_ivs.append((dte, atm_iv))
 
                 for put in puts:
                     vol = put.get("implied_volatility") or 0
@@ -108,7 +119,7 @@ class Command(BaseCommand):
                     time.sleep(delay)
 
             # Store IV30 snapshot (one per symbol per run)
-            iv30_val = ticker_info.get("iv30")
+            iv30_val = select_iv30_from_expiries(expiry_ivs)
             if iv30_val is not None:
                 IV30Snapshot.objects.update_or_create(
                     symbol=sym, date=today,

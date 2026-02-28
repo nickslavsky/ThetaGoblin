@@ -47,21 +47,14 @@ def get_expiry_dates(ticker: str) -> list[str]:
         return []
 
 
-def get_puts_chain(ticker: str, expiry: str, *, ticker_info: dict | None = None) -> list[dict] | None:
+def get_puts_chain(ticker: str, expiry: str) -> list[dict] | None:
     """Fetch puts chain for a ticker+expiry. Returns list of dicts or None on error.
     Dict keys: strike, bid, ask, implied_volatility, open_interest, volume, spot_price
-
-    If ticker_info dict is passed, populates it with:
-      - iv30: 30-day implied volatility from t.info (float or None)
-      - spot_price: current spot price
     """
     try:
         t = yf.Ticker(ticker)
         chain = t.option_chain(expiry)
         spot = t.info.get("currentPrice") or t.info.get("regularMarketPrice")
-        if ticker_info is not None:
-            ticker_info["iv30"] = _safe_float(t.info.get("impliedVolatility"), default=None)
-            ticker_info["spot_price"] = spot
         rows = []
         for _, row in chain.puts.iterrows():
             rows.append({
