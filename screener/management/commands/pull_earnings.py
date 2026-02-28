@@ -2,10 +2,12 @@ import logging
 import time
 from datetime import date, timedelta
 
+from django.conf import settings
 from django.core.management.base import BaseCommand
 
 from screener.models import EarningsDate, Symbol
 from screener.services import finnhub_client
+from screener.services.rate_limit import call_with_backoff
 
 logger = logging.getLogger(__name__)
 
@@ -45,9 +47,18 @@ class Command(BaseCommand):
         while chunk_start <= end_date:
             chunk_end = min(chunk_start + timedelta(days=CHUNK_DAYS - 1), end_date)
 
-            entries = finnhub_client.fetch_earnings(
-                chunk_start.isoformat(), chunk_end.isoformat()
+            chunk_label = f"earnings {chunk_start.isoformat()}–{chunk_end.isoformat()}"
+            entries = call_with_backoff(
+                finnhub_client.fetch_earnings,
+                chunk_start.isoformat(),
+                chunk_end.isoformat(),
+                label=chunk_label,
             )
+
+            if entries is None:
+                logger.error("Failed to fetch %s after retries, skipping chunk", chunk_label)
+                chunk_start = chunk_end + timedelta(days=1)
+                continue
 
             if len(entries) >= TRUNCATION_WARN_THRESHOLD:
                 logger.warning(
@@ -91,7 +102,7 @@ class Command(BaseCommand):
 
             chunk_start = chunk_end + timedelta(days=1)
             if chunk_start <= end_date:
-                time.sleep(0.5)
+                time.sleep(settings.FINNHUB_REQUEST_DELAY)
 
         self.stdout.write(
             self.style.SUCCESS(f"Done. Created: {created}, Skipped: {skipped}")

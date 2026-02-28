@@ -46,6 +46,12 @@ class OptionsSnapshot(models.Model):
     delta = models.FloatField(null=True, blank=True)
 
     class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["symbol", "snapshot_date", "expiry_date", "strike"],
+                name="unique_option_snapshot",
+            ),
+        ]
         indexes = [
             models.Index(fields=["symbol", "snapshot_date"]),
             models.Index(fields=["expiry_date"]),

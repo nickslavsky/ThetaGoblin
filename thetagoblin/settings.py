@@ -77,6 +77,13 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# Finnhub API rate-limit / backoff settings
+FINNHUB_REQUEST_DELAY = float(os.environ.get("FINNHUB_REQUEST_DELAY", "1.2"))
+FINNHUB_BACKOFF_BASE = float(os.environ.get("FINNHUB_BACKOFF_BASE", "5"))
+FINNHUB_BACKOFF_MULTIPLIER = float(os.environ.get("FINNHUB_BACKOFF_MULTIPLIER", "3"))
+FINNHUB_BACKOFF_MAX = float(os.environ.get("FINNHUB_BACKOFF_MAX", "3600"))
+FINNHUB_BACKOFF_MAX_RETRIES = int(os.environ.get("FINNHUB_BACKOFF_MAX_RETRIES", "10"))
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,

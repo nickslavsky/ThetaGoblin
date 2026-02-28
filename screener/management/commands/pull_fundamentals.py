@@ -2,12 +2,14 @@ import logging
 import time
 from datetime import timedelta
 
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db.models import Q
 from django.utils.timezone import now
 
 from screener.models import Symbol
 from screener.services import finnhub_client
+from screener.services.rate_limit import call_with_backoff
 
 logger = logging.getLogger(__name__)
 
@@ -28,17 +30,11 @@ class Command(BaseCommand):
             default=0,
             help="Max symbols to process — 0 means all (default: 0)",
         )
-        parser.add_argument(
-            "--delay",
-            type=float,
-            default=1.0,
-            help="Seconds between API calls to avoid rate limiting (default: 1.0)",
-        )
 
     def handle(self, *args, **options):
         stale_days = options["stale_days"]
         limit = options["limit"]
-        delay = options["delay"]
+        delay = settings.FINNHUB_REQUEST_DELAY
 
         cutoff = now() - timedelta(days=stale_days)
         qs = Symbol.objects.filter(
@@ -50,17 +46,18 @@ class Command(BaseCommand):
 
         symbols = list(qs)
         total = len(symbols)
-        self.stdout.write(f"Processing {total} symbols (stale_days={stale_days}, limit={limit})")
+        self.stdout.write(f"Processing {total} symbols (stale_days={stale_days}, delay={delay}s)")
 
         updated = 0
         failed = 0
 
-        for sym in symbols:
-            data = finnhub_client.fetch_fundamentals(sym.ticker)
+        for i, sym in enumerate(symbols, 1):
+            data = call_with_backoff(
+                finnhub_client.fetch_fundamentals, sym.ticker, label=sym.ticker
+            )
 
             if data is None:
                 failed += 1
-                logger.warning("Failed to fetch fundamentals for %s, skipping", sym.ticker)
                 if delay > 0:
                     time.sleep(delay)
                 continue
@@ -72,11 +69,14 @@ class Command(BaseCommand):
             sym.save()
             updated += 1
 
+            if i % 50 == 0:
+                self.stdout.write(f"  Progress: {i}/{total} (updated={updated}, failed={failed})")
+
             if delay > 0:
                 time.sleep(delay)
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Done. Updated: {updated}, Failed: {failed}"
+                f"Done. Updated: {updated}, Failed: {failed}, Total: {total}"
             )
         )
