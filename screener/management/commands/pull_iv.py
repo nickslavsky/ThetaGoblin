@@ -28,19 +28,18 @@ BACKOFF_INTERVALS = [5, 15, 45]  # seconds
 def _fetch_with_retry(date_from, date_to, sym_min, sym_max):
     """Fetch IV rows with retry logic for DoltHubError.
 
-    Returns list of row dicts, or [] if all retries exhausted.
+    Returns list of row dicts, or [] if all retries exhausted or on unexpected errors.
     """
     for attempt in range(MAX_RETRIES):
         try:
-            rows = dolthub_client.fetch_iv_rows(
+            return dolthub_client.fetch_iv_rows(
                 date_from=date_from,
                 date_to=date_to,
                 sym_min=sym_min,
                 sym_max=sym_max,
             )
-            return rows
         except DoltHubError as exc:
-            backoff = BACKOFF_INTERVALS[attempt] if attempt < len(BACKOFF_INTERVALS) else BACKOFF_INTERVALS[-1]
+            backoff = BACKOFF_INTERVALS[min(attempt, len(BACKOFF_INTERVALS) - 1)]
             if attempt < MAX_RETRIES - 1:
                 logger.warning(
                     "DoltHub error (attempt %d/%d) for %s [%s-%s]: %s. "
@@ -57,6 +56,13 @@ def _fetch_with_retry(date_from, date_to, sym_min, sym_max):
                     sym_min or "*", sym_max or "*", exc,
                 )
                 return []
+        except Exception:
+            logger.exception(
+                "Unexpected error fetching %s [%s-%s]. Skipping batch.",
+                date_from, sym_min or "*", sym_max or "*",
+            )
+            return []
+    return []
 
 
 class Command(BaseCommand):

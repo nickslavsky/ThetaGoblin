@@ -35,5 +35,16 @@ def start():
         replace_existing=True,
     )
 
+    # IV refresh from DoltHub + rank computation: daily at 8 PM ET
+    scheduler.add_job(
+        lambda: call_command("run_iv_pipeline"),
+        trigger=CronTrigger(hour=20, minute=0, timezone="America/New_York"),
+        id="iv_pipeline",
+        replace_existing=True,
+    )
+
     scheduler.start()
-    logger.info("APScheduler started: fundamentals at Fri 18:00, options at Fri 19:00 ET")
+    logger.info(
+        "APScheduler started: fundamentals Fri 18:00, options Fri 19:00, "
+        "IV daily 20:00 ET"
+    )

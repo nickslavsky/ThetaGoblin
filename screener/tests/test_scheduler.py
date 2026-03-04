@@ -10,7 +10,7 @@ class SchedulerTest(TestCase):
         self.assertTrue(hasattr(scheduler, "scheduler"))
 
     @patch("screener.scheduler.BackgroundScheduler")
-    def test_start_adds_two_jobs(self, mock_scheduler_cls):
+    def test_start_adds_three_jobs(self, mock_scheduler_cls):
         mock_sched = MagicMock()
         mock_sched.running = False
         mock_scheduler_cls.return_value = mock_sched
@@ -22,7 +22,7 @@ class SchedulerTest(TestCase):
         sched_module.scheduler = mock_sched
 
         sched_module.start()
-        self.assertEqual(mock_sched.add_job.call_count, 2)
+        self.assertEqual(mock_sched.add_job.call_count, 3)
         mock_sched.start.assert_called_once()
 
     @patch("screener.scheduler.BackgroundScheduler")

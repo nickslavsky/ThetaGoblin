@@ -22,6 +22,7 @@ REQUEST_TIMEOUT = 30  # seconds
 
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
+
 class DoltHubError(Exception):
     """Raised on retryable DoltHub API errors (HTTP 429, 5xx)."""
 
