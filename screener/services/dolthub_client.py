@@ -8,30 +8,24 @@ Uses only stdlib (urllib) -- no requests dependency.
 
 import json
 import logging
+import re
 from urllib.error import HTTPError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
-
-from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
 DOLTHUB_API_URL = (
     "https://www.dolthub.com/api/v1alpha1/post-no-preference/options/master"
 )
+REQUEST_TIMEOUT = 30  # seconds
 
-# Default delay between requests (seconds). Override via Django settings.
-_DEFAULT_REQUEST_DELAY = 2.0
-
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 class DoltHubError(Exception):
     """Raised on retryable DoltHub API errors (HTTP 429, 5xx)."""
 
     pass
-
-
-def _get_request_delay() -> float:
-    return getattr(settings, "DOLTHUB_REQUEST_DELAY", _DEFAULT_REQUEST_DELAY)
 
 
 def _execute_query(sql: str) -> dict:
@@ -50,7 +44,7 @@ def _execute_query(sql: str) -> dict:
     req = Request(url, headers={"Accept": "application/json"})
 
     try:
-        with urlopen(req, timeout=30) as resp:
+        with urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
             logger.debug("DoltHub response status: %d", resp.status)
             data = json.loads(resp.read().decode())
             return data
@@ -77,7 +71,11 @@ def fetch_iv_rows(
         sym_max: optional exclusive upper bound for act_symbol (alphabet batching)
 
     Returns list of row dicts on success, [] on any error.
+    Raises ValueError on malformed date inputs.
     """
+    if not _DATE_RE.match(date_from) or not _DATE_RE.match(date_to):
+        raise ValueError(f"Invalid date format: {date_from!r}, {date_to!r}")
+
     sql = (
         f"SELECT date, act_symbol, iv_current "
         f"FROM volatility_history "
@@ -128,8 +126,6 @@ def fetch_latest_date() -> str | None:
         latest = rows[0].get("latest")
         logger.debug("DoltHub latest date: %s", latest)
         return latest
-    except DoltHubError:
-        raise
     except Exception:
         logger.exception("Failed to fetch latest date from DoltHub")
         return None

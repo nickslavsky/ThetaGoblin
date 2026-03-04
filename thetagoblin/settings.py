@@ -84,6 +84,9 @@ FINNHUB_BACKOFF_MULTIPLIER = float(os.environ.get("FINNHUB_BACKOFF_MULTIPLIER", 
 FINNHUB_BACKOFF_MAX = float(os.environ.get("FINNHUB_BACKOFF_MAX", "3600"))
 FINNHUB_BACKOFF_MAX_RETRIES = int(os.environ.get("FINNHUB_BACKOFF_MAX_RETRIES", "10"))
 
+# DoltHub API rate-limit settings
+DOLTHUB_REQUEST_DELAY = float(os.environ.get("DOLTHUB_REQUEST_DELAY", "2.0"))
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
