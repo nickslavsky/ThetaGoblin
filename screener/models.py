@@ -68,8 +68,9 @@ class IVRank(models.Model):
     is_reliable = models.BooleanField(default=False, help_text="True when >= 52 weeks of history")
 
     class Meta:
-        unique_together = ["symbol", "computed_date"]
-        ordering = ["-computed_date"]
+        constraints = [
+            models.UniqueConstraint(fields=["symbol"], name="unique_ivrank_per_symbol"),
+        ]
 
 
 class IV30Snapshot(models.Model):

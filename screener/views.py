@@ -16,33 +16,23 @@ def candidates_view(request):
     delta_max = cfg.get("delta_target_max", 0.30)
     otm_min = cfg.get("otm_pct_min", 0.15)
     otm_max = cfg.get("otm_pct_max", 0.20)
-    iv_rank_min = cfg.get("iv_rank_min", 70)
-    iv_rank_max = cfg.get("iv_rank_max", 90)
     min_notional_oi = cfg.get("min_notional_oi", 10_000_000)
 
     qualifying_symbols = get_qualifying_symbols()
-    logger.debug("View funnel: %d qualifying symbols from fundamentals+earnings filter", len(qualifying_symbols))
+    logger.debug("View funnel: %d qualifying symbols", len(qualifying_symbols))
 
-    # Prefetch latest IVRank per qualifying symbol
-    iv_ranks = {}
-    for sym in qualifying_symbols:
-        latest = IVRank.objects.filter(symbol=sym).order_by("-computed_date").first()
-        if latest:
-            iv_ranks[sym.pk] = latest
-    logger.debug("View funnel: %d/%d have IV rank data", len(iv_ranks), len(qualifying_symbols))
+    # Bulk fetch IVRank for display
+    iv_ranks = {
+        r.symbol_id: r
+        for r in IVRank.objects.filter(symbol__in=qualifying_symbols)
+    }
 
     candidates = []
-    filtered_by_iv_rank = 0
     filtered_no_snapshots = 0
     filtered_no_otm_match = 0
     filtered_low_notional_oi = 0
     for sym in qualifying_symbols:
-        # Apply IV rank filter: only filter when reliable
         rank_obj = iv_ranks.get(sym.pk)
-        if rank_obj and rank_obj.is_reliable:
-            if rank_obj.iv_rank < iv_rank_min or rank_obj.iv_rank > iv_rank_max:
-                filtered_by_iv_rank += 1
-                continue
 
         snapshots = (
             OptionsSnapshot.objects.filter(
@@ -115,9 +105,8 @@ def candidates_view(request):
         )
 
     logger.debug(
-        "View funnel: %d filtered by IV rank (%s-%s), %d no option snapshots in delta range, "
+        "View funnel: %d no option snapshots in delta range, "
         "%d no strikes in OTM range (%s%%-%s%%), %d low notional OI (<%s) → %d final candidates",
-        filtered_by_iv_rank, iv_rank_min, iv_rank_max,
         filtered_no_snapshots,
         filtered_no_otm_match, otm_min * 100, otm_max * 100,
         filtered_low_notional_oi, f"${min_notional_oi:,.0f}",

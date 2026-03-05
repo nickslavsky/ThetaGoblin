@@ -35,8 +35,9 @@ class Command(BaseCommand):
                 continue
 
             IVRank.objects.update_or_create(
-                symbol=sym, computed_date=today,
+                symbol=sym,
                 defaults={
+                    "computed_date": today,
                     "iv_rank": result["iv_rank"],
                     "iv_percentile": result["iv_percentile"],
                     "weeks_of_history": result["weeks_of_history"],

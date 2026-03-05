@@ -58,6 +58,6 @@ class IVRankAdmin(admin.ModelAdmin):
         "symbol", "computed_date", "iv_rank", "iv_percentile",
         "is_reliable", "weeks_of_history",
     ]
-    list_filter = ["is_reliable", "computed_date"]
+    list_filter = ["is_reliable"]
     search_fields = ["symbol__ticker"]
-    ordering = ["-computed_date"]
+    ordering = ["symbol__ticker"]
