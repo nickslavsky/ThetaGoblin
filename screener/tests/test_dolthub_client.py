@@ -57,11 +57,11 @@ class FetchIvRowsTest(TestCase):
         self.assertEqual(rows, [])
 
     @patch("screener.services.dolthub_client.urlopen")
-    def test_returns_empty_on_network_error(self, mock_urlopen):
+    def test_raises_dolthub_error_on_network_error(self, mock_urlopen):
         mock_urlopen.side_effect = OSError("Connection refused")
 
-        rows = fetch_iv_rows("2026-03-01", "2026-03-04")
-        self.assertEqual(rows, [])
+        with self.assertRaises(DoltHubError):
+            fetch_iv_rows("2026-03-01", "2026-03-04")
 
     @patch("screener.services.dolthub_client.urlopen")
     def test_builds_sql_with_symbol_range(self, mock_urlopen):
@@ -113,11 +113,11 @@ class FetchLatestDateTest(TestCase):
         self.assertEqual(result, "2026-03-03")
 
     @patch("screener.services.dolthub_client.urlopen")
-    def test_returns_none_on_error(self, mock_urlopen):
+    def test_raises_dolthub_error_on_network_error(self, mock_urlopen):
         mock_urlopen.side_effect = OSError("timeout")
 
-        result = fetch_latest_date()
-        self.assertIsNone(result)
+        with self.assertRaises(DoltHubError):
+            fetch_latest_date()
 
     @patch("screener.services.dolthub_client.urlopen")
     def test_returns_none_on_empty_rows(self, mock_urlopen):
@@ -177,3 +177,11 @@ class ExecuteQueryTest(TestCase):
         result = _execute_query("SELECT col FROM t")
         self.assertEqual(result["query_execution_status"], "Success")
         self.assertEqual(len(result["rows"]), 1)
+
+    @patch("screener.services.dolthub_client.urlopen")
+    def test_raises_dolthub_error_on_network_timeout(self, mock_urlopen):
+        mock_urlopen.side_effect = OSError("Connection timed out")
+
+        with self.assertRaises(DoltHubError) as ctx:
+            _execute_query("SELECT 1")
+        self.assertIn("network error", str(ctx.exception))

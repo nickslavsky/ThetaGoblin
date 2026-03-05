@@ -9,6 +9,7 @@ from django.utils.timezone import now
 
 from screener.models import Symbol
 from screener.services import finnhub_client
+from screener.services.finnhub_client import RateLimitError
 from screener.services.rate_limit import call_with_backoff
 
 logger = logging.getLogger(__name__)
@@ -53,7 +54,10 @@ class Command(BaseCommand):
 
         for i, sym in enumerate(symbols, 1):
             data = call_with_backoff(
-                finnhub_client.fetch_fundamentals, sym.ticker, label=sym.ticker
+                finnhub_client.fetch_fundamentals,
+                sym.ticker,
+                retryable_exc=RateLimitError,
+                label=sym.ticker,
             )
 
             if data is None:

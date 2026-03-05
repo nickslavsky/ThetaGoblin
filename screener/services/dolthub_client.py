@@ -55,6 +55,8 @@ def _execute_query(sql: str) -> dict:
                 f"DoltHub HTTP {exc.code}: {exc.reason}"
             ) from exc
         raise
+    except OSError as exc:
+        raise DoltHubError(f"DoltHub network error: {exc}") from exc
 
 
 def fetch_iv_rows(
@@ -71,7 +73,8 @@ def fetch_iv_rows(
         sym_min: optional inclusive lower bound for act_symbol (alphabet batching)
         sym_max: optional exclusive upper bound for act_symbol (alphabet batching)
 
-    Returns list of row dicts on success, [] on any error.
+    Returns list of row dicts on success, [] on non-retryable error.
+    Raises DoltHubError on retryable errors (429, 5xx, network timeout).
     Raises ValueError on malformed date inputs.
     """
     if not _DATE_RE.match(date_from) or not _DATE_RE.match(date_to):
@@ -108,7 +111,8 @@ def fetch_iv_rows(
 def fetch_latest_date() -> str | None:
     """Fetch the most recent date with IV data from DoltHub.
 
-    Returns date string (YYYY-MM-DD) or None on error.
+    Returns date string (YYYY-MM-DD) on success, None on non-retryable error.
+    Raises DoltHubError on retryable errors (429, 5xx, network timeout).
     """
     sql = (
         "SELECT MAX(date) as latest "
@@ -127,6 +131,8 @@ def fetch_latest_date() -> str | None:
         latest = rows[0].get("latest")
         logger.debug("DoltHub latest date: %s", latest)
         return latest
+    except DoltHubError:
+        raise
     except Exception:
         logger.exception("Failed to fetch latest date from DoltHub")
         return None

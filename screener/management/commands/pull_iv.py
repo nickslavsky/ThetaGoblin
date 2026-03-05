@@ -8,6 +8,7 @@ from django.core.management.base import BaseCommand
 from screener.models import IV30Snapshot, Symbol
 from screener.services import dolthub_client
 from screener.services.dolthub_client import DoltHubError
+from screener.services.rate_limit import call_with_backoff
 
 logger = logging.getLogger(__name__)
 
@@ -19,50 +20,6 @@ ALPHABET_SPLITS = [
     {"sym_min": "G", "sym_max": "O"},
     {"sym_min": "O", "sym_max": None},
 ]
-
-# Retry settings for DoltHubError
-MAX_RETRIES = 3
-BACKOFF_INTERVALS = [5, 15, 45]  # seconds
-
-
-def _fetch_with_retry(date_from, date_to, sym_min, sym_max):
-    """Fetch IV rows with retry logic for DoltHubError.
-
-    Returns list of row dicts, or [] if all retries exhausted or on unexpected errors.
-    """
-    for attempt in range(MAX_RETRIES):
-        try:
-            return dolthub_client.fetch_iv_rows(
-                date_from=date_from,
-                date_to=date_to,
-                sym_min=sym_min,
-                sym_max=sym_max,
-            )
-        except DoltHubError as exc:
-            backoff = BACKOFF_INTERVALS[min(attempt, len(BACKOFF_INTERVALS) - 1)]
-            if attempt < MAX_RETRIES - 1:
-                logger.warning(
-                    "DoltHub error (attempt %d/%d) for %s [%s-%s]: %s. "
-                    "Retrying in %ds...",
-                    attempt + 1, MAX_RETRIES, date_from,
-                    sym_min or "*", sym_max or "*", exc, backoff,
-                )
-                time.sleep(backoff)
-            else:
-                logger.error(
-                    "DoltHub error (attempt %d/%d) for %s [%s-%s]: %s. "
-                    "Skipping batch.",
-                    attempt + 1, MAX_RETRIES, date_from,
-                    sym_min or "*", sym_max or "*", exc,
-                )
-                return []
-        except Exception:
-            logger.exception(
-                "Unexpected error fetching %s [%s-%s]. Skipping batch.",
-                date_from, sym_min or "*", sym_max or "*",
-            )
-            return []
-    return []
 
 
 class Command(BaseCommand):
@@ -80,13 +37,17 @@ class Command(BaseCommand):
         days_back = options["days_back"]
         delay = getattr(settings, "DOLTHUB_REQUEST_DELAY", 2.0)
 
-        # Step 1: Determine date range
-        dolthub_latest_str = dolthub_client.fetch_latest_date()
+        # Step 1: Determine date range (with retry on transient failures)
+        dolthub_latest_str = call_with_backoff(
+            dolthub_client.fetch_latest_date,
+            retryable_exc=DoltHubError,
+            label="fetch_latest_date",
+        )
         if dolthub_latest_str is None:
-            self.stdout.write(
-                self.style.WARNING("Could not reach DoltHub. Exiting.")
+            self.stderr.write(
+                self.style.ERROR("Could not reach DoltHub after retries. Aborting.")
             )
-            return
+            raise SystemExit(1)
 
         dolthub_latest = date.fromisoformat(dolthub_latest_str)
 
@@ -143,12 +104,15 @@ class Command(BaseCommand):
                     split["sym_max"] or "*",
                     date_str,
                 )
-                rows = _fetch_with_retry(
+                rows = call_with_backoff(
+                    dolthub_client.fetch_iv_rows,
                     date_from=date_str,
                     date_to=next_date_str,
                     sym_min=split["sym_min"],
                     sym_max=split["sym_max"],
-                )
+                    retryable_exc=DoltHubError,
+                    label=f"IV {date_str} [{split['sym_min'] or '*'}-{split['sym_max'] or '*'}]",
+                ) or []
 
                 for row in rows:
                     ticker = row.get("act_symbol", "").strip()

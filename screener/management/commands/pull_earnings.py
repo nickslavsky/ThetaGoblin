@@ -7,6 +7,7 @@ from django.core.management.base import BaseCommand
 
 from screener.models import EarningsDate, Symbol
 from screener.services import finnhub_client
+from screener.services.finnhub_client import RateLimitError
 from screener.services.rate_limit import call_with_backoff
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,7 @@ class Command(BaseCommand):
                 finnhub_client.fetch_earnings,
                 chunk_start.isoformat(),
                 chunk_end.isoformat(),
+                retryable_exc=RateLimitError,
                 label=chunk_label,
             )
 

@@ -7,6 +7,14 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.stdout.write("=== Starting IV pipeline ===")
-        call_command("pull_iv", stdout=self.stdout, stderr=self.stderr)
+        try:
+            call_command("pull_iv", stdout=self.stdout, stderr=self.stderr)
+        except SystemExit as exc:
+            self.stderr.write(
+                self.style.ERROR(
+                    f"pull_iv failed (exit {exc.code}). Skipping compute_iv_rank."
+                )
+            )
+            return
         call_command("compute_iv_rank", stdout=self.stdout, stderr=self.stderr)
         self.stdout.write("=== IV pipeline complete ===")

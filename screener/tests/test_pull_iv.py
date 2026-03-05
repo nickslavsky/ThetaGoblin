@@ -5,6 +5,7 @@ from django.test import TestCase, override_settings
 from django.core.management import call_command
 
 from screener.models import Symbol, IV30Snapshot
+from screener.services.dolthub_client import DoltHubError
 
 
 SAMPLE_ROWS = [
@@ -116,13 +117,18 @@ class PullIvTest(TestCase):
 
         mock_fetch.assert_not_called()
 
+    @override_settings(BACKOFF_MAX_RETRIES=2, BACKOFF_BASE=1, BACKOFF_MULTIPLIER=1, BACKOFF_MAX=1)
+    @patch("screener.services.rate_limit.time.sleep")
     @patch("screener.management.commands.pull_iv.time.sleep")
     @patch("screener.services.dolthub_client.fetch_iv_rows")
     @patch("screener.services.dolthub_client.fetch_latest_date")
-    def test_handles_dolthub_unavailable(self, mock_latest, mock_fetch, mock_sleep):
-        """When fetch_latest_date returns None, exit gracefully."""
-        mock_latest.return_value = None
+    def test_handles_dolthub_unavailable(self, mock_latest, mock_fetch, mock_cmd_sleep, mock_backoff_sleep):
+        """When fetch_latest_date raises DoltHubError after retries, raises SystemExit."""
+        mock_latest.side_effect = DoltHubError("timeout")
 
-        call_command("pull_iv")
-
+        with self.assertRaises(SystemExit) as ctx:
+            call_command("pull_iv")
+        self.assertEqual(ctx.exception.code, 1)
+        # BACKOFF_MAX_RETRIES=2 means 3 total attempts (0, 1, 2)
+        self.assertEqual(mock_latest.call_count, 3)
         mock_fetch.assert_not_called()
