@@ -24,7 +24,7 @@
 
 {% if candidates %}
     {% for candidate in candidates %}
-    <div class="candidate-card">
+    <div class="candidate-card" data-symbol-id="{{ candidate.symbol.pk }}">
         <div class="candidate-header">
             <h3>{{ candidate.symbol.ticker }}</h3>
             <span style="font-weight: 500; margin-left: 0.5rem;">{{ candidate.symbol.name }}</span>
@@ -58,7 +58,7 @@
                 <tbody>
                     {% for opt in candidate.options %}
                     <tr>
-                        <td>{{ opt.expiry }}</td>
+                        <td class="expiry-cell" data-expiry="{{ opt.expiry|date:'Y-m-d' }}">{{ opt.expiry }}</td>
                         <td>{{ opt.dte }}</td>
                         <td>${{ opt.strike }}</td>
                         <td class="otm-pct">{{ opt.otm_pct }}%</td>
@@ -83,4 +83,36 @@
         </p>
     </div>
 {% endif %}
+<script>
+document.querySelectorAll('.expiry-cell').forEach(cell => {
+    cell.addEventListener('click', function() {
+        const card = this.closest('.candidate-card');
+        const symbolId = card.dataset.symbolId;
+        const suppressUntil = this.dataset.expiry;
+
+        fetch('{% url "suppress_symbol" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}',
+            },
+            body: JSON.stringify({
+                symbol_id: parseInt(symbolId),
+                suppress_until: suppressUntil,
+            }),
+        })
+        .then(resp => {
+            if (resp.ok) {
+                card.remove();
+                const remaining = document.querySelectorAll('.candidate-card').length;
+                const countEl = document.querySelector('.header-bar small');
+                if (countEl) {
+                    const suffix = remaining === 1 ? '' : 's';
+                    countEl.textContent = 'CSP Candidates \u2014 ' + remaining + ' ticker' + suffix;
+                }
+            }
+        });
+    });
+});
+</script>
 {% endblock %}
