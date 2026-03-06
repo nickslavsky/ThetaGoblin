@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from django.test import TestCase
 from screener.models import FilterConfig, IVRank, Symbol
 from screener.services.candidates import get_qualifying_symbols
@@ -50,5 +50,46 @@ class IVRankFilterTest(TestCase):
         self.assertIn(self.sym, result)
 
     def test_includes_symbol_without_iv_rank(self):
+        result = get_qualifying_symbols()
+        self.assertIn(self.sym, result)
+
+
+class SuppressUntilFilterTest(TestCase):
+    """Tests for suppress_until filtering in get_qualifying_symbols()."""
+
+    def setUp(self):
+        self.sym = Symbol.objects.create(
+            ticker="MSFT", exchange_mic="XNAS", name="Microsoft Corp",
+            market_cap=3_000_000_000_000,
+            operating_margin=0.40,
+            cash_flow_per_share_annual=10.0,
+            long_term_debt_to_equity_annual=0.8,
+            ten_day_avg_trading_volume=5_000_000,
+        )
+
+    def test_suppressed_today_excluded(self):
+        """Symbol with suppress_until == today should NOT appear."""
+        self.sym.suppress_until = date.today()
+        self.sym.save()
+        result = get_qualifying_symbols()
+        self.assertNotIn(self.sym, result)
+
+    def test_suppressed_future_excluded(self):
+        """Symbol with suppress_until in the future should NOT appear."""
+        self.sym.suppress_until = date.today() + timedelta(days=30)
+        self.sym.save()
+        result = get_qualifying_symbols()
+        self.assertNotIn(self.sym, result)
+
+    def test_suppressed_yesterday_included(self):
+        """Symbol with suppress_until == yesterday should appear (strict inequality)."""
+        self.sym.suppress_until = date.today() - timedelta(days=1)
+        self.sym.save()
+        result = get_qualifying_symbols()
+        self.assertIn(self.sym, result)
+
+    def test_null_suppress_until_included(self):
+        """Symbol with no suppress_until should appear."""
+        self.assertIsNone(self.sym.suppress_until)
         result = get_qualifying_symbols()
         self.assertIn(self.sym, result)

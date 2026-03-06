@@ -24,6 +24,10 @@ def get_qualifying_symbols() -> list:
     )
 
     today = date.today()
+
+    # Suppress filter: hide symbols with active suppress_until
+    symbols = symbols.exclude(suppress_until__gte=today)
+
     exclusion_cutoff = today + timedelta(days=cfg["earnings_exclusion_days"])
     logger.debug("Earnings exclusion window: %s to %s", today, exclusion_cutoff)
     tickers_with_upcoming_earnings = set(
