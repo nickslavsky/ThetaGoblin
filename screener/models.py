@@ -10,6 +10,10 @@ class Symbol(models.Model):
     cash_flow_per_share_annual = models.FloatField(null=True, blank=True)
     long_term_debt_to_equity_annual = models.FloatField(null=True, blank=True)
     ten_day_avg_trading_volume = models.FloatField(null=True, blank=True)
+    suppress_until = models.DateField(
+        null=True, blank=True,
+        help_text="Hide from candidates until this date (exclusive — reappears day after)",
+    )
     fundamentals_updated_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
