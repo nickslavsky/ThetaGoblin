@@ -1,3 +1,4 @@
+import json
 from datetime import date, timedelta
 from unittest.mock import patch
 from django.test import TestCase, Client
@@ -210,3 +211,49 @@ class RefreshCandidatesViewTest(TestCase):
         mock_fetch.return_value = []
         resp = self.client.get("/candidates/refresh/")
         self.assertEqual(resp.status_code, 200)
+
+
+class SuppressViewTest(TestCase):
+
+    def setUp(self):
+        self.client = Client()
+        self.aapl = Symbol.objects.create(
+            ticker="AAPL", exchange_mic="XNAS", name="Apple Inc",
+            market_cap=3_000_000_000_000,
+            operating_margin=0.30,
+            cash_flow_per_share_annual=7.5,
+            long_term_debt_to_equity_annual=1.2,
+            ten_day_avg_trading_volume=5_000_000,
+        )
+
+    def test_suppress_sets_date(self):
+        resp = self.client.post(
+            "/candidates/suppress/",
+            data=json.dumps({"symbol_id": self.aapl.pk, "suppress_until": "2026-04-18"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.aapl.refresh_from_db()
+        self.assertEqual(self.aapl.suppress_until, date(2026, 4, 18))
+
+    def test_suppress_returns_json(self):
+        resp = self.client.post(
+            "/candidates/suppress/",
+            data=json.dumps({"symbol_id": self.aapl.pk, "suppress_until": "2026-04-18"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp["Content-Type"], "application/json")
+        body = resp.json()
+        self.assertEqual(body["status"], "ok")
+
+    def test_suppress_rejects_get(self):
+        resp = self.client.get("/candidates/suppress/")
+        self.assertEqual(resp.status_code, 405)
+
+    def test_suppress_missing_symbol_returns_404(self):
+        resp = self.client.post(
+            "/candidates/suppress/",
+            data=json.dumps({"symbol_id": 99999, "suppress_until": "2026-04-18"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 404)

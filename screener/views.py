@@ -1,9 +1,12 @@
+import json
 import logging
 from datetime import date
 
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.views.decorators.http import require_POST
 
-from screener.models import FilterConfig, IVRank, OptionsSnapshot
+from screener.models import FilterConfig, IVRank, OptionsSnapshot, Symbol
 from screener.services.candidates import get_qualifying_symbols
 from screener.services.live_options import fetch_live_options
 
@@ -147,3 +150,16 @@ def refresh_candidates(request):
             "is_live": True,
         },
     )
+
+
+@require_POST
+def suppress_symbol(request):
+    """Set suppress_until on a Symbol. Called via AJAX from candidates page."""
+    try:
+        body = json.loads(request.body)
+        symbol = Symbol.objects.get(pk=body["symbol_id"])
+        symbol.suppress_until = body["suppress_until"]
+        symbol.save(update_fields=["suppress_until"])
+        return JsonResponse({"status": "ok"})
+    except Symbol.DoesNotExist:
+        return JsonResponse({"error": "Symbol not found"}, status=404)
