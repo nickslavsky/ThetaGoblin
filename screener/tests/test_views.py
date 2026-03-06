@@ -175,6 +175,13 @@ class CandidatesViewTest(TestCase):
         resp = self.client.get("/candidates/")
         self.assertContains(resp, "NOI:")
 
+    def test_suppressed_symbol_hidden_from_view(self):
+        """Symbol with suppress_until >= today should not appear in candidates."""
+        self.aapl.suppress_until = date.today() + timedelta(days=30)
+        self.aapl.save()
+        resp = self.client.get("/candidates/")
+        self.assertNotContains(resp, "AAPL")
+
 
 class RefreshCandidatesViewTest(TestCase):
 
