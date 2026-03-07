@@ -34,10 +34,6 @@ class AdminAccessTest(TestCase):
         resp = self.client.get("/admin/screener/earningsdate/")
         self.assertEqual(resp.status_code, 200)
 
-    def test_options_snapshot_changelist_loads(self):
-        resp = self.client.get("/admin/screener/optionssnapshot/")
-        self.assertEqual(resp.status_code, 200)
-
     def test_iv30_snapshot_changelist_loads(self):
         resp = self.client.get("/admin/screener/iv30snapshot/")
         self.assertEqual(resp.status_code, 200)

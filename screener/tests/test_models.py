@@ -1,6 +1,6 @@
 from django.test import TestCase
 from django.db import IntegrityError
-from screener.models import Symbol, EarningsDate, OptionsSnapshot, IVRank, IV30Snapshot, FilterConfig
+from screener.models import Symbol, EarningsDate, IVRank, IV30Snapshot, FilterConfig
 
 
 class SymbolModelTest(TestCase):
@@ -24,24 +24,6 @@ class EarningsDateModelTest(TestCase):
         self.assertEqual(EarningsDate.objects.count(), 1)
         self.sym.delete()
         self.assertEqual(EarningsDate.objects.count(), 0)
-
-
-class OptionsSnapshotModelTest(TestCase):
-    def setUp(self):
-        self.sym = Symbol.objects.create(ticker="AAPL", exchange_mic="XNAS", name="Apple Inc")
-
-    def test_fk_cascade_delete(self):
-        from datetime import date
-        OptionsSnapshot.objects.create(
-            symbol=self.sym,
-            snapshot_date=date(2026, 2, 23),
-            expiry_date=date(2026, 3, 21),
-            dte_at_snapshot=26,
-            strike="220.00",
-            spot_price="230.00",
-        )
-        self.sym.delete()
-        self.assertEqual(OptionsSnapshot.objects.count(), 0)
 
 
 class IVRankModelTest(TestCase):

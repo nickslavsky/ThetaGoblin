@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from screener.models import EarningsDate, FilterConfig, IV30Snapshot, IVRank, OptionsSnapshot, Symbol
+from screener.models import EarningsDate, FilterConfig, IV30Snapshot, IVRank, Symbol
 
 
 @admin.register(FilterConfig)
@@ -33,16 +33,6 @@ class EarningsDateAdmin(admin.ModelAdmin):
     search_fields = ["symbol__ticker"]
     ordering = ["-report_date"]
 
-
-@admin.register(OptionsSnapshot)
-class OptionsSnapshotAdmin(admin.ModelAdmin):
-    list_display = [
-        "symbol", "snapshot_date", "expiry_date", "dte_at_snapshot",
-        "strike", "spot_price", "delta", "bid", "ask",
-    ]
-    list_filter = ["snapshot_date", "expiry_date"]
-    search_fields = ["symbol__ticker"]
-    ordering = ["-snapshot_date", "symbol", "expiry_date", "strike"]
 
 
 @admin.register(IV30Snapshot)

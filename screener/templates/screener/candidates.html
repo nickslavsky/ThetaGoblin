@@ -6,89 +6,82 @@
 <div class="header-bar">
     <div>
         <h1 style="margin:0;">ThetaGoblin</h1>
-        <small>CSP Candidates — {{ candidate_count }} ticker{{ candidate_count|pluralize }}</small>
-        {% if is_live %}
-            <span style="display:inline-block; background:var(--pico-primary-background); color:var(--pico-primary-inverse); padding:0.1rem 0.5rem; border-radius:4px; font-size:0.75rem; margin-left:0.5rem; vertical-align:middle;">Live data</span>
-        {% endif %}
+        <small id="candidate-count">CSP Candidates — loading…</small>
     </div>
     <div>
-        {% if last_snapshot and not is_live %}
-            <small style="color: var(--pico-muted-color);">Last snapshot: {{ last_snapshot.snapshot_date }}</small>
-        {% endif %}
-        <form method="post" action="{% url 'refresh_candidates' %}" style="display:inline; margin-left: 1rem;">
-            {% csrf_token %}
-            <button type="submit" class="secondary" style="margin:0;">&#8635; Refresh</button>
-        </form>
+        <button id="refresh-btn" class="secondary" style="margin:0;">&#8635; Refresh</button>
     </div>
 </div>
 
-{% if candidates %}
-    {% for candidate in candidates %}
-    <div class="candidate-card" data-symbol-id="{{ candidate.symbol.pk }}">
-        <div class="candidate-header">
-            <h3>{{ candidate.symbol.ticker }}</h3>
-            <span style="font-weight: 500; margin-left: 0.5rem;">{{ candidate.symbol.name }}</span>
-            <span class="spot-price">Spot: ${{ candidate.spot }}</span>
-            {% if candidate.iv_rank is not None %}
-                <span style="display:inline-block; background:#e8e8e8; padding:0.1rem 0.5rem; border-radius:4px; font-size:0.8rem; margin-left:0.5rem;">
-                    IVR: {{ candidate.iv_rank }}{% if candidate.iv_rank_reliable == False %}*{% endif %}
-                </span>
-            {% endif %}
-            {% if candidate.notional_oi %}
-                <span class="badge" style="display:inline-block; background:#e8e8e8; padding:0.1rem 0.5rem; border-radius:4px; font-size:0.8rem; margin-left:0.5rem;" title="Notional Open Interest (avg OI x avg strike)">
-                    NOI: {{ candidate.notional_oi }}
-                </span>
-            {% endif %}
-        </div>
+<div id="spinner" aria-busy="true" style="text-align:center; padding:2rem;">
+    Scanning options chains…
+</div>
 
-        <div style="overflow-x: auto;">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Expiry</th>
-                        <th>DTE</th>
-                        <th>Strike</th>
-                        <th>OTM %</th>
-                        <th>Bid</th>
-                        <th>Ask</th>
-                        <th>Delta</th>
-                        <th>IV %</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for opt in candidate.options %}
-                    <tr>
-                        <td class="expiry-cell" data-expiry="{{ opt.expiry|date:'Y-m-d' }}">{{ opt.expiry }}</td>
-                        <td>{{ opt.dte }}</td>
-                        <td>${{ opt.strike }}</td>
-                        <td class="otm-pct">{{ opt.otm_pct }}%</td>
-                        <td>{% if opt.bid %}${{ opt.bid }}{% else %}&mdash;{% endif %}</td>
-                        <td>{% if opt.ask %}${{ opt.ask }}{% else %}&mdash;{% endif %}</td>
-                        <td>{{ opt.delta }}</td>
-                        <td>{% if opt.iv %}{{ opt.iv }}%{% else %}&mdash;{% endif %}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    {% endfor %}
-{% else %}
-    <div class="no-candidates">
-        <h2>No candidates found</h2>
-        <p>Run the pipeline to load data, or check your FilterConfig thresholds.</p>
-        <p>
-            <a href="/admin/screener/filterconfig/">Edit FilterConfig</a> &middot;
-            <code>docker compose exec web python manage.py run_fundamentals_pipeline</code>
-        </p>
-    </div>
-{% endif %}
+<div id="candidates-container"></div>
+
+<div id="no-candidates" class="no-candidates" style="display:none;">
+    <h2>No candidates found</h2>
+    <p>Check your FilterConfig thresholds or try again later.</p>
+    <p><a href="/admin/screener/filterconfig/">Edit FilterConfig</a></p>
+</div>
+
 <script>
-document.querySelectorAll('.expiry-cell').forEach(cell => {
-    cell.addEventListener('click', function() {
-        const card = this.closest('.candidate-card');
-        const symbolId = card.dataset.symbolId;
-        const suppressUntil = this.dataset.expiry;
+(function() {
+    var container = document.getElementById('candidates-container');
+    var spinner = document.getElementById('spinner');
+    var countEl = document.getElementById('candidate-count');
+    var noResults = document.getElementById('no-candidates');
+    var refreshBtn = document.getElementById('refresh-btn');
+    var evtSource = null;
+
+    function startStream() {
+        container.innerHTML = '';
+        spinner.style.display = '';
+        noResults.style.display = 'none';
+        countEl.textContent = 'CSP Candidates \u2014 loading\u2026';
+        refreshBtn.disabled = true;
+
+        if (evtSource) {
+            evtSource.close();
+        }
+
+        evtSource = new EventSource('{% url "candidates_stream" %}');
+
+        evtSource.addEventListener('candidate', function(e) {
+            container.insertAdjacentHTML('beforeend', e.data);
+        });
+
+        evtSource.addEventListener('done', function(e) {
+            var count = parseInt(e.data, 10);
+            spinner.style.display = 'none';
+            refreshBtn.disabled = false;
+            var suffix = count === 1 ? '' : 's';
+            countEl.textContent = 'CSP Candidates \u2014 ' + count + ' ticker' + suffix;
+            if (count === 0) {
+                noResults.style.display = '';
+            }
+            evtSource.close();
+            evtSource = null;
+        });
+
+        evtSource.addEventListener('error', function() {
+            spinner.style.display = 'none';
+            refreshBtn.disabled = false;
+            if (evtSource) {
+                evtSource.close();
+                evtSource = null;
+            }
+        });
+    }
+
+    // Suppress: event delegation on container (cards are added dynamically)
+    container.addEventListener('click', function(e) {
+        var cell = e.target.closest('.expiry-cell');
+        if (!cell) return;
+
+        var card = cell.closest('.candidate-card');
+        var symbolId = card.dataset.symbolId;
+        var suppressUntil = cell.dataset.expiry;
 
         fetch('{% url "suppress_symbol" %}', {
             method: 'POST',
@@ -100,19 +93,19 @@ document.querySelectorAll('.expiry-cell').forEach(cell => {
                 symbol_id: parseInt(symbolId),
                 suppress_until: suppressUntil,
             }),
-        })
-        .then(resp => {
+        }).then(function(resp) {
             if (resp.ok) {
                 card.remove();
-                const remaining = document.querySelectorAll('.candidate-card').length;
-                const countEl = document.querySelector('.header-bar small');
-                if (countEl) {
-                    const suffix = remaining === 1 ? '' : 's';
-                    countEl.textContent = 'CSP Candidates \u2014 ' + remaining + ' ticker' + suffix;
-                }
+                var remaining = container.querySelectorAll('.candidate-card').length;
+                var suffix = remaining === 1 ? '' : 's';
+                countEl.textContent = 'CSP Candidates \u2014 ' + remaining + ' ticker' + suffix;
             }
         });
     });
-});
+
+    refreshBtn.addEventListener('click', startStream);
+
+    startStream();
+})();
 </script>
 {% endblock %}

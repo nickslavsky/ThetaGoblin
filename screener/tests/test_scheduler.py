@@ -22,7 +22,7 @@ class SchedulerTest(TestCase):
         sched_module.scheduler = mock_sched
 
         sched_module.start()
-        self.assertEqual(mock_sched.add_job.call_count, 3)
+        self.assertEqual(mock_sched.add_job.call_count, 2)
         mock_sched.start.assert_called_once()
 
     @patch("screener.scheduler.BackgroundScheduler")

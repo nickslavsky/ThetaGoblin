@@ -1,11 +1,11 @@
 from datetime import date, timedelta
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 from django.test import TestCase
-from screener.models import Symbol, OptionsSnapshot
-from screener.services.live_options import fetch_live_options
+from screener.models import Symbol
+from screener.services.live_options import stream_live_candidates
 
 
-class FetchLiveOptionsTest(TestCase):
+class StreamLiveCandidatesTest(TestCase):
 
     def setUp(self):
         self.sym = Symbol.objects.create(
@@ -33,14 +33,13 @@ class FetchLiveOptionsTest(TestCase):
     @patch("screener.services.live_options.yfinance_svc.get_puts_chain")
     def test_returns_correct_structure(self, mock_chain, mock_expiries):
         mock_expiries.return_value = [self.expiry.isoformat()]
-        # vol=0.80 gives delta≈-0.21 for 195/230 at 35 DTE (in display band)
         mock_chain.return_value = [{
             "strike": 195.0, "bid": 2.50, "ask": 2.70,
             "implied_volatility": 0.80, "open_interest": 500,
             "volume": 120, "spot_price": 230.0,
         }]
 
-        result = fetch_live_options([self.sym], self.cfg)
+        result = list(stream_live_candidates([self.sym], self.cfg))
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["symbol"], self.sym)
         self.assertEqual(result[0]["spot"], 230.0)
@@ -49,19 +48,6 @@ class FetchLiveOptionsTest(TestCase):
         self.assertIn("expiry", opt)
         self.assertIn("strike", opt)
         self.assertIn("delta", opt)
-
-    @patch("screener.services.live_options.yfinance_svc.get_expiry_dates")
-    @patch("screener.services.live_options.yfinance_svc.get_puts_chain")
-    def test_no_db_writes(self, mock_chain, mock_expiries):
-        mock_expiries.return_value = [self.expiry.isoformat()]
-        mock_chain.return_value = [{
-            "strike": 195.0, "bid": 2.50, "ask": 2.70,
-            "implied_volatility": 0.80, "open_interest": 500,
-            "volume": 120, "spot_price": 230.0,
-        }]
-
-        fetch_live_options([self.sym], self.cfg)
-        self.assertEqual(OptionsSnapshot.objects.count(), 0)
 
     @patch("screener.services.live_options.yfinance_svc.get_expiry_dates")
     @patch("screener.services.live_options.yfinance_svc.get_puts_chain")
@@ -75,7 +61,7 @@ class FetchLiveOptionsTest(TestCase):
             "volume": 120, "spot_price": 230.0,
         }]
 
-        result = fetch_live_options([self.sym], self.cfg)
+        result = list(stream_live_candidates([self.sym], self.cfg))
         self.assertEqual(len(result), 0)
         mock_chain.assert_not_called()
 
@@ -84,12 +70,53 @@ class FetchLiveOptionsTest(TestCase):
     def test_filters_otm_range(self, mock_chain, mock_expiries):
         """Strikes outside OTM% range should be excluded."""
         mock_expiries.return_value = [self.expiry.isoformat()]
-        # strike=220, spot=230 → OTM=4.3%, below 15% min
         mock_chain.return_value = [{
             "strike": 220.0, "bid": 2.50, "ask": 2.70,
             "implied_volatility": 0.28, "open_interest": 500,
             "volume": 120, "spot_price": 230.0,
         }]
 
-        result = fetch_live_options([self.sym], self.cfg)
+        result = list(stream_live_candidates([self.sym], self.cfg))
+        self.assertEqual(len(result), 0)
+
+    @patch("screener.services.live_options.yfinance_svc.get_expiry_dates")
+    @patch("screener.services.live_options.yfinance_svc.get_puts_chain")
+    def test_includes_iv_rank(self, mock_chain, mock_expiries):
+        """Yielded candidate should include iv_rank from pre-fetched iv_ranks dict."""
+        mock_expiries.return_value = [self.expiry.isoformat()]
+        mock_chain.return_value = [{
+            "strike": 195.0, "bid": 2.50, "ask": 2.70,
+            "implied_volatility": 0.80, "open_interest": 500,
+            "volume": 120, "spot_price": 230.0,
+        }]
+
+        mock_rank = Mock(iv_rank=75.3, is_reliable=True)
+        iv_ranks = {self.sym.pk: mock_rank}
+
+        result = list(stream_live_candidates([self.sym], self.cfg, iv_ranks=iv_ranks))
+        self.assertEqual(len(result), 1)
+        self.assertAlmostEqual(result[0]["iv_rank"], 75.3)
+        self.assertTrue(result[0]["iv_rank_reliable"])
+
+    @patch("screener.services.live_options.yfinance_svc.get_expiry_dates")
+    @patch("screener.services.live_options.yfinance_svc.get_puts_chain")
+    def test_iv_rank_none_without_data(self, mock_chain, mock_expiries):
+        """iv_rank should be None when iv_ranks dict has no entry for symbol."""
+        mock_expiries.return_value = [self.expiry.isoformat()]
+        mock_chain.return_value = [{
+            "strike": 195.0, "bid": 2.50, "ask": 2.70,
+            "implied_volatility": 0.80, "open_interest": 500,
+            "volume": 120, "spot_price": 230.0,
+        }]
+
+        result = list(stream_live_candidates([self.sym], self.cfg))
+        self.assertEqual(len(result), 1)
+        self.assertIsNone(result[0]["iv_rank"])
+        self.assertIsNone(result[0]["iv_rank_reliable"])
+
+    @patch("screener.services.live_options.yfinance_svc.get_expiry_dates")
+    def test_continues_on_yfinance_error(self, mock_expiries):
+        """Network failure on one symbol should not abort the stream."""
+        mock_expiries.side_effect = Exception("network error")
+        result = list(stream_live_candidates([self.sym], self.cfg))
         self.assertEqual(len(result), 0)

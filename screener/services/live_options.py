@@ -7,11 +7,13 @@ from screener.services.options_math import compute_put_delta
 logger = logging.getLogger(__name__)
 
 
-def fetch_live_options(symbols, cfg: dict) -> list[dict]:
-    """Fetch live options data for display only — no DB writes.
+def stream_live_candidates(symbols, cfg: dict, iv_ranks: dict | None = None):
+    """Generator yielding one candidate dict per qualifying symbol.
 
-    Returns list of candidate dicts with the same shape as candidates_view builds,
-    so the same template works for both DB-backed and live data.
+    Fetches live options from yfinance. No DB writes.
+    Each yielded dict has: symbol, spot, options, notional_oi, iv_rank, iv_rank_reliable.
+
+    iv_ranks: optional dict mapping symbol_id -> IVRank instance (pre-fetched by caller).
     """
     dte_min = cfg.get("expiry_dte_min", 30)
     dte_max = cfg.get("expiry_dte_max", 45)
@@ -23,7 +25,6 @@ def fetch_live_options(symbols, cfg: dict) -> list[dict]:
     min_notional_oi = cfg.get("min_notional_oi", 10_000_000)
 
     today = date.today()
-    candidates = []
 
     for sym in symbols:
         try:
@@ -89,7 +90,6 @@ def fetch_live_options(symbols, cfg: dict) -> list[dict]:
                 oi_strike_pairs.append((put.get("open_interest") or 0, float(strike)))
 
         if options_data and spot is not None:
-            # Compute notional OI: avg(open_interest) x avg(strike)
             avg_oi = sum(oi for oi, _ in oi_strike_pairs) / len(oi_strike_pairs)
             avg_strike = sum(s for _, s in oi_strike_pairs) / len(oi_strike_pairs)
             notional_oi = avg_oi * avg_strike
@@ -97,11 +97,19 @@ def fetch_live_options(symbols, cfg: dict) -> list[dict]:
             if notional_oi < min_notional_oi:
                 continue
 
-            candidates.append({
+            iv_rank_display = None
+            iv_rank_reliable = None
+            if iv_ranks:
+                rank_obj = iv_ranks.get(sym.pk)
+                if rank_obj:
+                    iv_rank_display = round(rank_obj.iv_rank, 1)
+                    iv_rank_reliable = rank_obj.is_reliable
+
+            yield {
                 "symbol": sym,
                 "spot": spot,
                 "options": options_data,
+                "iv_rank": iv_rank_display,
+                "iv_rank_reliable": iv_rank_reliable,
                 "notional_oi": f"${notional_oi:,.0f}",
-            })
-
-    return candidates
+            }
