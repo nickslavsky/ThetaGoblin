@@ -27,14 +27,6 @@ def start():
         replace_existing=True,
     )
 
-    # Options: every Friday at 7 PM ET (after fundamentals completes)
-    scheduler.add_job(
-        lambda: call_command("run_options_pipeline"),
-        trigger=CronTrigger(day_of_week="fri", hour=19, minute=0, timezone="America/New_York"),
-        id="options_pipeline",
-        replace_existing=True,
-    )
-
     # IV refresh from DoltHub + rank computation: daily at 8 PM ET
     scheduler.add_job(
         lambda: call_command("run_iv_pipeline"),
@@ -45,6 +37,6 @@ def start():
 
     scheduler.start()
     logger.info(
-        "APScheduler started: fundamentals Fri 18:00, options Fri 19:00, "
+        "APScheduler started: fundamentals Fri 18:00, "
         "IV daily 20:00 ET"
     )

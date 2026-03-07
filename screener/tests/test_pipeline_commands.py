@@ -20,22 +20,6 @@ class RunFundamentalsPipelineTest(TestCase):
         self.assertLess(calls.index("pull_fundamentals"), calls.index("pull_earnings"))
 
 
-class RunOptionsPipelineTest(TestCase):
-
-    @patch("screener.management.commands.run_options_pipeline.call_command")
-    def test_calls_pull_options(self, mock_call):
-        call_command("run_options_pipeline")
-        calls = [c[0][0] for c in mock_call.call_args_list]
-        self.assertIn("pull_options", calls)
-
-    @patch("screener.management.commands.run_options_pipeline.call_command")
-    def test_does_not_call_compute_iv_rank(self, mock_call):
-        """compute_iv_rank is now in the IV pipeline, not options pipeline."""
-        call_command("run_options_pipeline")
-        calls = [c[0][0] for c in mock_call.call_args_list]
-        self.assertNotIn("compute_iv_rank", calls)
-
-
 class RunIvPipelineTest(TestCase):
 
     @patch("screener.management.commands.run_iv_pipeline.call_command")

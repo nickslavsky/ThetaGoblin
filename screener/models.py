@@ -34,35 +34,6 @@ class EarningsDate(models.Model):
         ordering = ["report_date"]
 
 
-class OptionsSnapshot(models.Model):
-    symbol = models.ForeignKey(Symbol, on_delete=models.CASCADE, related_name="options_snapshots")
-    snapshot_date = models.DateField()
-    expiry_date = models.DateField()
-    dte_at_snapshot = models.IntegerField()
-    strike = models.DecimalField(max_digits=10, decimal_places=2)
-    spot_price = models.DecimalField(max_digits=10, decimal_places=2)
-    implied_volatility = models.FloatField(null=True, blank=True)
-    bid = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
-    ask = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True)
-    spread_pct = models.FloatField(null=True, blank=True)
-    open_interest = models.IntegerField(null=True, blank=True)
-    volume = models.IntegerField(null=True, blank=True)
-    delta = models.FloatField(null=True, blank=True)
-
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["symbol", "snapshot_date", "expiry_date", "strike"],
-                name="unique_option_snapshot",
-            ),
-        ]
-        indexes = [
-            models.Index(fields=["symbol", "snapshot_date"]),
-            models.Index(fields=["expiry_date"]),
-        ]
-        ordering = ["symbol", "expiry_date", "strike"]
-
-
 class IVRank(models.Model):
     symbol = models.ForeignKey(Symbol, on_delete=models.CASCADE, related_name="iv_ranks")
     computed_date = models.DateField()
