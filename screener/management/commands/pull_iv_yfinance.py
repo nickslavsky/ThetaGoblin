@@ -31,12 +31,22 @@ class Command(BaseCommand):
         delay = settings.YFINANCE_REQUEST_DELAY
         today = date.today()
 
-        qs = Symbol.objects.order_by("ticker")
+        # Skip symbols already computed today
+        already_done = set(
+            IV30Snapshot.objects.filter(
+                date=today, iv30_yfinance__isnull=False,
+            ).values_list("symbol_id", flat=True)
+        )
+
+        qs = Symbol.objects.exclude(id__in=already_done).order_by("ticker")
         if limit:
             qs = qs[:limit]
 
         symbols = list(qs)
         total = len(symbols)
+        skipped = len(already_done)
+        if skipped:
+            self.stdout.write(f"Skipping {skipped} symbols already computed today")
         self.stdout.write(f"Processing {total} symbols for yfinance IV30 (delay={delay}s)")
 
         rows = []

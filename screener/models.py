@@ -52,7 +52,7 @@ class IV30Snapshot(models.Model):
     symbol = models.ForeignKey(Symbol, on_delete=models.CASCADE, related_name="iv30_snapshots")
     date = models.DateField()
     iv30 = models.FloatField(null=True, blank=True, help_text="30-day implied volatility from DoltHub (decimal, e.g. 0.28)")
-    iv30_yfinance = models.FloatField(default=0.0, help_text="30-day implied volatility from yfinance (decimal, e.g. 0.28)")
+    iv30_yfinance = models.FloatField(null=True, blank=True, help_text="30-day implied volatility from yfinance (decimal, e.g. 0.28)")
 
     class Meta:
         unique_together = ["symbol", "date"]
