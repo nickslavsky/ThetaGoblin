@@ -9,11 +9,12 @@ from screener.services.yfinance_svc import fetch_iv30, YFinanceError
 
 class FetchIV30Test(TestCase):
 
-    def _mock_chain(self, puts_data, calls_data):
+    def _mock_chain(self, puts_data, calls_data, spot=None):
         """Helper to build a mock option_chain return value."""
         mock = MagicMock()
         mock.puts = pd.DataFrame(puts_data)
         mock.calls = pd.DataFrame(calls_data)
+        mock.underlying = {"regularMarketPrice": spot} if spot else {}
         return mock
 
     @staticmethod
@@ -30,7 +31,6 @@ class FetchIV30Test(TestCase):
         mock_ticker = MagicMock()
         # 2026-04-17 is 3rd Friday of April, 38 DTE from Mar 10
         mock_ticker.options = ("2026-03-13", "2026-03-20", "2026-04-17", "2026-05-15")
-        mock_ticker.info = {"currentPrice": 230.0}
         mock_ticker.option_chain.return_value = self._mock_chain(
             puts_data=[
                 {"strike": 225.0, "impliedVolatility": 0.30},
@@ -42,6 +42,7 @@ class FetchIV30Test(TestCase):
                 {"strike": 230.0, "impliedVolatility": 0.26},
                 {"strike": 235.0, "impliedVolatility": 0.28},
             ],
+            spot=230.0,
         )
         mock_ticker_cls.return_value = mock_ticker
 
@@ -60,10 +61,10 @@ class FetchIV30Test(TestCase):
         # 2026-03-13 = weekly (not 3rd Friday), 2026-03-20 = 3rd Fri of March but only 10 DTE
         # 2026-04-17 = 3rd Fri of April, 38 DTE -> this should be selected
         mock_ticker.options = ("2026-03-13", "2026-03-20", "2026-04-17")
-        mock_ticker.info = {"currentPrice": 100.0}
         mock_ticker.option_chain.return_value = self._mock_chain(
             puts_data=[{"strike": 100.0, "impliedVolatility": 0.35}],
             calls_data=[{"strike": 100.0, "impliedVolatility": 0.33}],
+            spot=100.0,
         )
         mock_ticker_cls.return_value = mock_ticker
 
@@ -79,7 +80,6 @@ class FetchIV30Test(TestCase):
         self._setup_mock_date(mock_date, date(2026, 3, 10))
         mock_ticker = MagicMock()
         mock_ticker.options = ("2026-04-17",)
-        mock_ticker.info = {"currentPrice": 152.0}
         mock_ticker.option_chain.return_value = self._mock_chain(
             puts_data=[
                 {"strike": 145.0, "impliedVolatility": 0.40},
@@ -91,6 +91,7 @@ class FetchIV30Test(TestCase):
                 {"strike": 150.0, "impliedVolatility": 0.30},
                 {"strike": 155.0, "impliedVolatility": 0.35},
             ],
+            spot=152.0,
         )
         mock_ticker_cls.return_value = mock_ticker
 
@@ -140,10 +141,10 @@ class FetchIV30Test(TestCase):
         self._setup_mock_date(mock_date, date(2026, 3, 10))
         mock_ticker = MagicMock()
         mock_ticker.options = ("2026-04-17",)
-        mock_ticker.info = {"currentPrice": 100.0}
         mock_ticker.option_chain.return_value = self._mock_chain(
             puts_data=[{"strike": 100.0, "impliedVolatility": 0.30}],
             calls_data=[{"strike": 95.0, "impliedVolatility": 0.28}],
+            spot=100.0,
         )
         mock_ticker_cls.return_value = mock_ticker
 

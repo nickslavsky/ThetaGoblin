@@ -147,11 +147,13 @@ def fetch_iv30(ticker: str) -> float:
     target_expiry = candidates[0][1]
 
     try:
-        spot = t.info.get("currentPrice") or t.info.get("regularMarketPrice")
         chain = t.option_chain(target_expiry)
     except Exception as exc:
         raise YFinanceError(f"Failed to fetch chain for {ticker} exp {target_expiry}: {exc}") from exc
 
+    # Spot price comes free from the option_chain response — no extra HTTP call
+    underlying = chain.underlying or {}
+    spot = underlying.get("regularMarketPrice")
     if not spot:
         raise YFinanceError(f"No spot price for {ticker}")
 
