@@ -12,15 +12,13 @@ def get_qualifying_symbols() -> list:
     """
     cfg = {fc.key: fc.typed_value for fc in FilterConfig.objects.all()}
 
-    min_avg_volume = cfg.get("min_avg_volume", 1.5)
-
     symbols = Symbol.objects.filter(
         market_cap__isnull=False,
         market_cap__gte=cfg["market_cap_min"],
         operating_margin__gt=cfg["operating_margin_min"],
         cash_flow_per_share_annual__gt=cfg["free_cash_flow_min"],
         long_term_debt_to_equity_annual__lt=cfg["debt_to_equity_max"],
-        ten_day_avg_trading_volume__gte=min_avg_volume,
+        ten_day_avg_trading_volume__gte=cfg["min_avg_volume"],
     )
 
     today = date.today()
@@ -40,14 +38,12 @@ def get_qualifying_symbols() -> list:
     symbols = symbols.exclude(ticker__in=tickers_with_upcoming_earnings)
 
     # IV rank filter: exclude symbols with reliable IV rank outside [min, max]
-    iv_rank_min = cfg.get("iv_rank_min", 70)
-    iv_rank_max = cfg.get("iv_rank_max", 90)
     symbols = symbols.exclude(
         iv_ranks__is_reliable=True,
-        iv_ranks__iv_rank__lt=iv_rank_min,
+        iv_ranks__iv_rank__lt=cfg["iv_rank_min"],
     ).exclude(
         iv_ranks__is_reliable=True,
-        iv_ranks__iv_rank__gt=iv_rank_max,
+        iv_ranks__iv_rank__gt=cfg["iv_rank_max"],
     )
 
     result = list(symbols)
