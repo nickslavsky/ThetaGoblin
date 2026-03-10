@@ -7,9 +7,9 @@ class Symbol(models.Model):
     name = models.CharField(max_length=255)
     market_cap = models.BigIntegerField(null=True, blank=True)
     operating_margin = models.FloatField(null=True, blank=True)
-    cash_flow_per_share_annual = models.FloatField(null=True, blank=True)
-    long_term_debt_to_equity_annual = models.FloatField(null=True, blank=True)
-    ten_day_avg_trading_volume = models.FloatField(null=True, blank=True)
+    free_cash_flow = models.FloatField(null=True, blank=True)
+    debt_to_equity = models.FloatField(null=True, blank=True)
+    avg_volume_10d = models.FloatField(null=True, blank=True)
     suppress_until = models.DateField(
         null=True, blank=True,
         help_text="Hide from candidates until this date (exclusive — reappears day after)",

@@ -17,7 +17,7 @@ class FilterConfigAdmin(admin.ModelAdmin):
 class SymbolAdmin(admin.ModelAdmin):
     list_display = [
         "ticker", "name", "exchange_mic", "market_cap",
-        "operating_margin", "ten_day_avg_trading_volume",
+        "operating_margin", "avg_volume_10d",
         "suppress_until", "fundamentals_updated_at",
     ]
     list_filter = ["exchange_mic"]
