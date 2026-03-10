@@ -37,13 +37,11 @@ def get_qualifying_symbols() -> list:
 
     symbols = symbols.exclude(ticker__in=tickers_with_upcoming_earnings)
 
-    # IV rank filter: exclude symbols with reliable IV rank outside [min, max]
-    symbols = symbols.exclude(
+    # IV rank filter: require reliable IV rank within [min, max]
+    symbols = symbols.filter(
         iv_ranks__is_reliable=True,
-        iv_ranks__iv_rank__lt=cfg["iv_rank_min"],
-    ).exclude(
-        iv_ranks__is_reliable=True,
-        iv_ranks__iv_rank__gt=cfg["iv_rank_max"],
+        iv_ranks__iv_rank__gte=cfg["iv_rank_min"],
+        iv_ranks__iv_rank__lte=cfg["iv_rank_max"],
     )
 
     result = list(symbols)
