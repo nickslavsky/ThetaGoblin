@@ -52,7 +52,8 @@ class Command(BaseCommand):
         dolthub_latest = date.fromisoformat(dolthub_latest_str)
 
         local_latest = (
-            IV30Snapshot.objects.order_by("-date")
+            IV30Snapshot.objects.filter(iv30__isnull=False)
+            .order_by("-date")
             .values_list("date", flat=True)
             .first()
         )
