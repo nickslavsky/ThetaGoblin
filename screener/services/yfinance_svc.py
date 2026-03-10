@@ -15,6 +15,11 @@ warnings.filterwarnings(
 logger = logging.getLogger(__name__)
 
 
+class YFinanceError(Exception):
+    """Raised on yfinance errors that should trigger backoff retry."""
+    pass
+
+
 def _safe_float(val, default: float = 0.0) -> float:
     """Cast to float, treating None and NaN as default."""
     if val is None:
@@ -26,7 +31,7 @@ def _safe_float(val, default: float = 0.0) -> float:
         return default
 
 
-def _safe_int(val, default: int = 0) -> int:
+def _safe_int(val, default: int | None = 0) -> int | None:
     """Cast to int, treating None and NaN as default."""
     if val is None:
         return default
@@ -70,3 +75,38 @@ def get_puts_chain(ticker: str, expiry: str) -> list[dict] | None:
     except Exception:
         logger.exception("Failed to get puts chain for %s exp %s", ticker, expiry)
         return None
+
+
+def _safe_optional(val):
+    """Return val as-is if it's a real number, else None."""
+    if val is None:
+        return None
+    try:
+        f = float(val)
+        return None if math.isnan(f) else val
+    except (TypeError, ValueError):
+        return None
+
+
+def fetch_fundamentals(ticker: str) -> dict:
+    """Fetch fundamental metrics for a single ticker from yfinance.
+
+    Returns a dict with keys matching Symbol model fields.
+    Raises YFinanceError on any failure (for backoff compatibility).
+    """
+    try:
+        t = yf.Ticker(ticker)
+        info = t.info
+    except Exception as exc:
+        raise YFinanceError(f"Failed to fetch info for {ticker}: {exc}") from exc
+
+    if not info:
+        raise YFinanceError(f"Empty info response for {ticker}")
+
+    return {
+        "market_cap": _safe_int(info.get("marketCap"), default=None),
+        "operating_margin": _safe_optional(info.get("operatingMargins")),
+        "free_cash_flow": _safe_int(info.get("freeCashflow"), default=None),
+        "debt_to_equity": _safe_optional(info.get("debtToEquity")),
+        "avg_volume_10d": _safe_int(info.get("averageVolume10days"), default=None),
+    }
