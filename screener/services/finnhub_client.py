@@ -2,6 +2,7 @@ import logging
 import os
 
 import requests
+from requests.exceptions import ConnectionError, ReadTimeout, Timeout
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,10 @@ def fetch_earnings(from_date: str, to_date: str) -> list[dict]:
         return resp.json().get("earningsCalendar", [])
     except RateLimitError:
         raise
+    except (Timeout, ReadTimeout, ConnectionError) as exc:
+        raise RateLimitError(
+            f"Transient error fetching earnings {from_date} to {to_date}: {exc}"
+        ) from exc
     except Exception:
         logger.exception("Failed to fetch earnings calendar %s to %s", from_date, to_date)
         return []
