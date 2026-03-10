@@ -51,9 +51,9 @@ class Command(BaseCommand):
                             "name": row.get("name", "").strip(),
                             "market_cap": _parse_int(row.get("market_cap")),
                             "operating_margin": _parse_float(row.get("operating_margin")),
-                            "cash_flow_per_share_annual": _parse_float(row.get("cash_flow_per_share_annual")),
-                            "long_term_debt_to_equity_annual": _parse_float(row.get("long_term_debt_to_equity_annual")),
-                            "ten_day_avg_trading_volume": _parse_float(row.get("ten_day_avg_trading_volume")),
+                            "free_cash_flow": _parse_float(row.get("free_cash_flow")),
+                            "debt_to_equity": _parse_float(row.get("debt_to_equity")),
+                            "avg_volume_10d": _parse_float(row.get("avg_volume_10d")),
                         },
                     )
                     if created:

@@ -16,9 +16,9 @@ def get_qualifying_symbols() -> list:
         market_cap__isnull=False,
         market_cap__gte=cfg["market_cap_min"],
         operating_margin__gt=cfg["operating_margin_min"],
-        cash_flow_per_share_annual__gt=cfg["free_cash_flow_min"],
-        long_term_debt_to_equity_annual__lt=cfg["debt_to_equity_max"],
-        ten_day_avg_trading_volume__gte=cfg["min_avg_volume"],
+        free_cash_flow__gt=cfg["free_cash_flow_min"],
+        debt_to_equity__lt=cfg["debt_to_equity_max"],
+        avg_volume_10d__gte=cfg["min_avg_volume"],
     )
 
     today = date.today()
