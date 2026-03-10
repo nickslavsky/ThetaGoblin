@@ -21,6 +21,11 @@ class YFinanceError(Exception):
     pass
 
 
+class NoOptionsError(Exception):
+    """Raised when a symbol has no suitable options data. Not retryable."""
+    pass
+
+
 def _safe_float(val, default: float = 0.0) -> float:
     """Cast to float, treating None and NaN as default."""
     if val is None:
@@ -126,7 +131,7 @@ def fetch_iv30(ticker: str) -> float:
         raise YFinanceError(f"Failed to fetch options for {ticker}: {exc}") from exc
 
     if not expiries:
-        raise YFinanceError(f"No options expiries for {ticker}")
+        raise NoOptionsError(f"No options expiries for {ticker}")
 
     today = date.today()
     min_dte = 20
@@ -140,7 +145,7 @@ def fetch_iv30(ticker: str) -> float:
             candidates.append((dte, exp_str))
 
     if not candidates:
-        raise YFinanceError(f"No monthly expiry with >= {min_dte} DTE for {ticker}")
+        raise NoOptionsError(f"No monthly expiry with >= {min_dte} DTE for {ticker}")
 
     # Pick nearest
     candidates.sort()
@@ -155,7 +160,7 @@ def fetch_iv30(ticker: str) -> float:
     underlying = chain.underlying or {}
     spot = underlying.get("regularMarketPrice")
     if not spot:
-        raise YFinanceError(f"No spot price for {ticker}")
+        raise NoOptionsError(f"No spot price for {ticker}")
 
     put_iv = _find_atm_iv(chain.puts, spot)
     call_iv = _find_atm_iv(chain.calls, spot)
@@ -167,7 +172,7 @@ def fetch_iv30(ticker: str) -> float:
     elif call_iv is not None:
         return call_iv
     else:
-        raise YFinanceError(f"No valid ATM IV found for {ticker} exp {target_expiry}")
+        raise NoOptionsError(f"No valid ATM IV found for {ticker} exp {target_expiry}")
 
 
 def fetch_fundamentals(ticker: str) -> dict:

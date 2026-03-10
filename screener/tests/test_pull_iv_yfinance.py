@@ -4,6 +4,7 @@ from unittest.mock import patch
 from django.test import TestCase
 
 from screener.models import IV30Snapshot, Symbol
+from screener.services.yfinance_svc import NoOptionsError
 
 
 class PullIVYfinanceTest(TestCase):
@@ -77,6 +78,19 @@ class PullIVYfinanceTest(TestCase):
         snap = IV30Snapshot.objects.get(symbol=self.sym1, date=date.today())
         self.assertAlmostEqual(snap.iv30, 0.25)  # DoltHub preserved
         self.assertAlmostEqual(snap.iv30_yfinance, 0.30)  # yfinance filled in
+
+    @patch("screener.management.commands.pull_iv_yfinance.call_with_backoff")
+    def test_no_options_skipped_without_retry(self, mock_backoff):
+        """Symbols with no options should be skipped immediately, not retried."""
+        mock_backoff.side_effect = [NoOptionsError("No options"), 0.35]
+
+        from django.core.management import call_command
+        call_command("pull_iv_yfinance")
+
+        # Only MSFT gets a snapshot — AAPL had no options
+        self.assertEqual(IV30Snapshot.objects.count(), 1)
+        self.assertFalse(IV30Snapshot.objects.filter(symbol=self.sym1).exists())
+        self.assertTrue(IV30Snapshot.objects.filter(symbol=self.sym2).exists())
 
     @patch("screener.management.commands.pull_iv_yfinance.call_with_backoff")
     def test_limit_flag_restricts_symbols(self, mock_backoff):

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 from django.test import TestCase
 
-from screener.services.yfinance_svc import fetch_iv30, YFinanceError
+from screener.services.yfinance_svc import fetch_iv30, NoOptionsError, YFinanceError
 
 
 class FetchIV30Test(TestCase):
@@ -104,26 +104,26 @@ class FetchIV30Test(TestCase):
     @patch("screener.services.yfinance_svc.date")
     @patch("screener.services.yfinance_svc.yf.Ticker")
     def test_raises_when_no_monthly_with_min_dte(self, mock_ticker_cls, mock_date):
-        """Should raise YFinanceError when no monthly has >= 20 DTE."""
+        """Should raise NoOptionsError (not retryable) when no monthly has >= 20 DTE."""
         self._setup_mock_date(mock_date, date(2026, 3, 10))
         mock_ticker = MagicMock()
         # Only weekly expiries, no monthly with >= 20 DTE
         mock_ticker.options = ("2026-03-13", "2026-03-20", "2026-03-27")
         mock_ticker_cls.return_value = mock_ticker
 
-        with self.assertRaises(YFinanceError):
+        with self.assertRaises(NoOptionsError):
             fetch_iv30("TEST")
 
     @patch("screener.services.yfinance_svc.date")
     @patch("screener.services.yfinance_svc.yf.Ticker")
     def test_raises_when_no_options(self, mock_ticker_cls, mock_date):
-        """Should raise YFinanceError when ticker has no options."""
+        """Should raise NoOptionsError (not retryable) when ticker has no options."""
         self._setup_mock_date(mock_date, date(2026, 3, 10))
         mock_ticker = MagicMock()
         mock_ticker.options = ()
         mock_ticker_cls.return_value = mock_ticker
 
-        with self.assertRaises(YFinanceError):
+        with self.assertRaises(NoOptionsError):
             fetch_iv30("TEST")
 
     @patch("screener.services.yfinance_svc.yf.Ticker")
