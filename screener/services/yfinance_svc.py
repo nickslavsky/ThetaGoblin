@@ -1,6 +1,7 @@
 import logging
 import math
 import warnings
+from datetime import date
 
 import yfinance as yf
 
@@ -86,6 +87,85 @@ def _safe_optional(val):
         return None if math.isnan(f) else val
     except (TypeError, ValueError):
         return None
+
+
+def _is_monthly_expiry(expiry_date: date) -> bool:
+    """Check if a date is the 3rd Friday of its month (standard monthly options)."""
+    if expiry_date.weekday() != 4:  # Friday
+        return False
+    # 3rd Friday falls on days 15-21
+    return 15 <= expiry_date.day <= 21
+
+
+def _find_atm_iv(df, spot: float) -> float | None:
+    """Find the implied volatility of the strike closest to spot price.
+
+    Returns None if dataframe is empty or has no valid IV.
+    """
+    if df.empty:
+        return None
+    strikes = df["strike"].values
+    idx = min(range(len(strikes)), key=lambda i: abs(strikes[i] - spot))
+    iv = df.iloc[idx]["impliedVolatility"]
+    return _safe_float(iv, default=None)
+
+
+def fetch_iv30(ticker: str) -> float:
+    """Compute 30-day implied volatility from yfinance options chain.
+
+    Picks the nearest monthly expiry with >= 20 DTE, finds ATM strike,
+    averages put and call IV at that strike.
+
+    Returns IV as a decimal (e.g. 0.28).
+    Raises YFinanceError if no suitable expiry or on network failure.
+    """
+    try:
+        t = yf.Ticker(ticker)
+        expiries = t.options
+    except Exception as exc:
+        raise YFinanceError(f"Failed to fetch options for {ticker}: {exc}") from exc
+
+    if not expiries:
+        raise YFinanceError(f"No options expiries for {ticker}")
+
+    today = date.today()
+    min_dte = 20
+
+    # Filter to monthly expiries with sufficient DTE
+    candidates = []
+    for exp_str in expiries:
+        exp_date = date.fromisoformat(exp_str)
+        dte = (exp_date - today).days
+        if dte >= min_dte and _is_monthly_expiry(exp_date):
+            candidates.append((dte, exp_str))
+
+    if not candidates:
+        raise YFinanceError(f"No monthly expiry with >= {min_dte} DTE for {ticker}")
+
+    # Pick nearest
+    candidates.sort()
+    target_expiry = candidates[0][1]
+
+    try:
+        spot = t.info.get("currentPrice") or t.info.get("regularMarketPrice")
+        chain = t.option_chain(target_expiry)
+    except Exception as exc:
+        raise YFinanceError(f"Failed to fetch chain for {ticker} exp {target_expiry}: {exc}") from exc
+
+    if not spot:
+        raise YFinanceError(f"No spot price for {ticker}")
+
+    put_iv = _find_atm_iv(chain.puts, spot)
+    call_iv = _find_atm_iv(chain.calls, spot)
+
+    if put_iv is not None and call_iv is not None:
+        return (put_iv + call_iv) / 2
+    elif put_iv is not None:
+        return put_iv
+    elif call_iv is not None:
+        return call_iv
+    else:
+        raise YFinanceError(f"No valid ATM IV found for {ticker} exp {target_expiry}")
 
 
 def fetch_fundamentals(ticker: str) -> dict:
