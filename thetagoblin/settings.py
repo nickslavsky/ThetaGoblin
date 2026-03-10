@@ -80,6 +80,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Per-API request delays (seconds between sequential calls)
 FINNHUB_REQUEST_DELAY = float(os.environ.get("FINNHUB_REQUEST_DELAY", "1.2"))
 DOLTHUB_REQUEST_DELAY = float(os.environ.get("DOLTHUB_REQUEST_DELAY", "2.0"))
+YFINANCE_REQUEST_DELAY = float(os.environ.get("YFINANCE_REQUEST_DELAY", "0.5"))
 
 # Centralized exponential backoff (applies to all external APIs)
 BACKOFF_BASE = float(os.environ.get("BACKOFF_BASE", "5"))
