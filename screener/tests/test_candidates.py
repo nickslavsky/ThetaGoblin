@@ -41,17 +41,17 @@ class IVRankFilterTest(TestCase):
         result = get_qualifying_symbols()
         self.assertIn(self.sym, result)
 
-    def test_includes_unreliable_iv_rank_outside_range(self):
+    def test_excludes_unreliable_iv_rank_outside_range(self):
         IVRank.objects.create(
             symbol=self.sym, computed_date=date.today(),
             iv_rank=50.0, weeks_of_history=10, is_reliable=False,
         )
         result = get_qualifying_symbols()
-        self.assertIn(self.sym, result)
+        self.assertNotIn(self.sym, result)
 
-    def test_includes_symbol_without_iv_rank(self):
+    def test_excludes_symbol_without_iv_rank(self):
         result = get_qualifying_symbols()
-        self.assertIn(self.sym, result)
+        self.assertNotIn(self.sym, result)
 
 
 class SuppressUntilFilterTest(TestCase):
@@ -65,6 +65,10 @@ class SuppressUntilFilterTest(TestCase):
             free_cash_flow=150_000_000_000,
             debt_to_equity=80.0,
             avg_volume_10d=5_000_000,
+        )
+        IVRank.objects.create(
+            symbol=self.sym, computed_date=date.today(),
+            iv_rank=75.0, weeks_of_history=52, is_reliable=True,
         )
 
     def test_suppressed_today_excluded(self):
