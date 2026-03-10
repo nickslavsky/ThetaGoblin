@@ -8,15 +8,15 @@ from django.db.models import Q
 from django.utils.timezone import now
 
 from screener.models import Symbol
-from screener.services import finnhub_client
-from screener.services.finnhub_client import RateLimitError
+from screener.services import yfinance_svc
+from screener.services.yfinance_svc import YFinanceError
 from screener.services.rate_limit import call_with_backoff
 
 logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = "Pull/refresh fundamentals from Finnhub for stale symbols"
+    help = "Pull/refresh fundamentals from Yahoo Finance for stale symbols"
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -35,7 +35,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         stale_days = options["stale_days"]
         limit = options["limit"]
-        delay = settings.FINNHUB_REQUEST_DELAY
+        delay = settings.YFINANCE_REQUEST_DELAY
 
         cutoff = now() - timedelta(days=stale_days)
         qs = Symbol.objects.filter(
@@ -54,9 +54,9 @@ class Command(BaseCommand):
 
         for i, sym in enumerate(symbols, 1):
             data = call_with_backoff(
-                finnhub_client.fetch_fundamentals,
+                yfinance_svc.fetch_fundamentals,
                 sym.ticker,
-                retryable_exc=RateLimitError,
+                retryable_exc=YFinanceError,
                 label=sym.ticker,
             )
 
