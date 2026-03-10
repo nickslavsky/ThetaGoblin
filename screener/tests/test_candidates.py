@@ -12,9 +12,9 @@ class IVRankFilterTest(TestCase):
             ticker="AAPL", exchange_mic="XNAS", name="Apple Inc",
             market_cap=3_000_000_000_000,
             operating_margin=0.30,
-            cash_flow_per_share_annual=7.5,
-            long_term_debt_to_equity_annual=1.2,
-            ten_day_avg_trading_volume=5_000_000,
+            free_cash_flow=106_000_000_000,
+            debt_to_equity=120.0,
+            avg_volume_10d=5_000_000,
         )
 
     def test_excludes_reliable_iv_rank_below_min(self):
@@ -62,9 +62,9 @@ class SuppressUntilFilterTest(TestCase):
             ticker="MSFT", exchange_mic="XNAS", name="Microsoft Corp",
             market_cap=3_000_000_000_000,
             operating_margin=0.40,
-            cash_flow_per_share_annual=10.0,
-            long_term_debt_to_equity_annual=0.8,
-            ten_day_avg_trading_volume=5_000_000,
+            free_cash_flow=150_000_000_000,
+            debt_to_equity=80.0,
+            avg_volume_10d=5_000_000,
         )
 
     def test_suppressed_today_excluded(self):

@@ -1,6 +1,8 @@
 import logging
 from datetime import date, timedelta
 
+from django.db.models import Q
+
 from screener.models import EarningsDate, FilterConfig, Symbol
 
 logger = logging.getLogger(__name__)
@@ -37,9 +39,14 @@ def get_qualifying_symbols() -> list:
 
     symbols = symbols.exclude(ticker__in=tickers_with_upcoming_earnings)
 
-    symbols = symbols.filter(
-        iv_ranks__iv_rank__gte=cfg["iv_rank_min"],
-        iv_ranks__iv_rank__lte=cfg["iv_rank_max"],
+    # IV rank filter: only exclude symbols that have a *reliable* IV rank outside [min, max].
+    # Symbols with no IV rank or an unreliable one pass through (marked in UI).
+    symbols = symbols.exclude(
+        Q(iv_ranks__is_reliable=True) &
+        ~Q(
+            iv_ranks__iv_rank__gte=cfg["iv_rank_min"],
+            iv_ranks__iv_rank__lte=cfg["iv_rank_max"],
+        )
     )
 
     result = list(symbols)
