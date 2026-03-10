@@ -12,9 +12,6 @@ from screener.services.rate_limit import call_with_backoff
 
 logger = logging.getLogger(__name__)
 
-BATCH_SIZE = 500
-
-
 class Command(BaseCommand):
     help = "Pull IV30 from yfinance options chains for all symbols"
 
@@ -49,7 +46,7 @@ class Command(BaseCommand):
             self.stdout.write(f"Skipping {skipped} symbols already computed today")
         self.stdout.write(f"Processing {total} symbols for yfinance IV30 (delay={delay}s)")
 
-        rows = []
+        upserted = 0
         failed = 0
         no_options = 0
 
@@ -72,29 +69,17 @@ class Command(BaseCommand):
                     time.sleep(delay)
                 continue
 
-            rows.append(IV30Snapshot(
-                symbol=sym,
-                date=today,
-                iv30_yfinance=iv30,
-            ))
+            IV30Snapshot.objects.update_or_create(
+                symbol=sym, date=today,
+                defaults={"iv30_yfinance": iv30},
+            )
+            upserted += 1
 
             if i % 100 == 0:
-                self.stdout.write(f"  Progress: {i}/{total} (collected={len(rows)}, failed={failed})")
+                self.stdout.write(f"  Progress: {i}/{total} (upserted={upserted}, failed={failed})")
 
             if delay > 0:
                 time.sleep(delay)
-
-        # Bulk upsert — only update iv30_yfinance, leave iv30 alone
-        upserted = 0
-        for i in range(0, len(rows), BATCH_SIZE):
-            batch = rows[i : i + BATCH_SIZE]
-            IV30Snapshot.objects.bulk_create(
-                batch,
-                update_conflicts=True,
-                unique_fields=["symbol", "date"],
-                update_fields=["iv30_yfinance"],
-            )
-            upserted += len(batch)
 
         self.stdout.write(
             self.style.SUCCESS(
