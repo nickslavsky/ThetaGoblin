@@ -9,7 +9,11 @@
         body { padding: 1rem 2rem; }
         .header-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; border-bottom: 1px solid var(--pico-muted-border-color); padding-bottom: 1rem; }
         .candidate-card { margin-bottom: 2rem; padding: 1rem 1.5rem; border: 1px solid var(--pico-muted-border-color); border-radius: var(--pico-border-radius); }
-        .candidate-header { margin-bottom: 0.5rem; }
+        .candidate-card details { margin-bottom: 0; }
+        summary.candidate-header { margin-bottom: 0.5rem; cursor: pointer; list-style: none; display: flex; align-items: center; flex-wrap: wrap; gap: 0; }
+        summary.candidate-header::-webkit-details-marker { display: none; }
+        summary.candidate-header::before { content: '\25b6'; font-size: 0.7rem; margin-right: 0.5rem; transition: transform 0.15s; }
+        details[open] > summary.candidate-header::before { transform: rotate(90deg); }
         .candidate-header h3 { margin: 0; display: inline; }
         .spot-price { margin-left: 1rem; color: var(--pico-muted-color); }
         table { margin-top: 0.5rem; font-size: 0.9rem; }

@@ -1,48 +1,50 @@
 <div class="candidate-card" data-symbol-id="{{ candidate.symbol.pk }}">
-    <div class="candidate-header">
-        <h3>{{ candidate.symbol.ticker }}</h3>
-        <span style="font-weight: 500; margin-left: 0.5rem;">{{ candidate.symbol.name }}</span>
-        <span class="spot-price">Spot: ${{ candidate.spot }}</span>
-        {% if candidate.iv_rank is not None %}
-            <span style="display:inline-block; background:#e8e8e8; padding:0.1rem 0.5rem; border-radius:4px; font-size:0.8rem; margin-left:0.5rem;">
-                IVR: {{ candidate.iv_rank }}{% if candidate.iv_rank_reliable == False %}*{% endif %}
-            </span>
-        {% endif %}
-        {% if candidate.notional_oi %}
-            <span class="badge" style="display:inline-block; background:#e8e8e8; padding:0.1rem 0.5rem; border-radius:4px; font-size:0.8rem; margin-left:0.5rem;" title="Notional Open Interest (avg OI x avg strike)">
-                NOI: {{ candidate.notional_oi }}
-            </span>
-        {% endif %}
-    </div>
+    <details>
+        <summary class="candidate-header">
+            <h3>{{ candidate.symbol.ticker }}</h3>
+            <span style="font-weight: 500; margin-left: 0.5rem;">{{ candidate.symbol.name }}</span>
+            <span class="spot-price">Spot: ${{ candidate.spot }}</span>
+            {% if candidate.iv_rank is not None %}
+                <span style="display:inline-block; background:#e8e8e8; padding:0.1rem 0.5rem; border-radius:4px; font-size:0.8rem; margin-left:0.5rem;">
+                    IVR: {{ candidate.iv_rank }}{% if candidate.iv_rank_reliable == False %}*{% endif %}
+                </span>
+            {% endif %}
+            {% if candidate.notional_oi %}
+                <span class="badge" style="display:inline-block; background:#e8e8e8; padding:0.1rem 0.5rem; border-radius:4px; font-size:0.8rem; margin-left:0.5rem;" title="Notional Open Interest (avg OI x avg strike)">
+                    NOI: {{ candidate.notional_oi }}
+                </span>
+            {% endif %}
+        </summary>
 
-    <div style="overflow-x: auto;">
-        <table>
-            <thead>
-                <tr>
-                    <th>Expiry</th>
-                    <th>DTE</th>
-                    <th>Strike</th>
-                    <th>OTM %</th>
-                    <th>Bid</th>
-                    <th>Ask</th>
-                    <th>Delta</th>
-                    <th>IV %</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for opt in candidate.options %}
-                <tr>
-                    <td class="expiry-cell" data-expiry="{{ opt.expiry|date:'Y-m-d' }}">{{ opt.expiry }}</td>
-                    <td>{{ opt.dte }}</td>
-                    <td>${{ opt.strike }}</td>
-                    <td class="otm-pct">{{ opt.otm_pct }}%</td>
-                    <td>{% if opt.bid %}${{ opt.bid }}{% else %}&mdash;{% endif %}</td>
-                    <td>{% if opt.ask %}${{ opt.ask }}{% else %}&mdash;{% endif %}</td>
-                    <td>{{ opt.delta }}</td>
-                    <td>{% if opt.iv %}{{ opt.iv }}%{% else %}&mdash;{% endif %}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+        <div style="overflow-x: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Expiry</th>
+                        <th>DTE</th>
+                        <th>Strike</th>
+                        <th>OTM %</th>
+                        <th>Bid</th>
+                        <th>Ask</th>
+                        <th>Delta</th>
+                        <th>IV %</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for opt in candidate.options %}
+                    <tr>
+                        <td class="expiry-cell" data-expiry="{{ opt.expiry|date:'Y-m-d' }}">{{ opt.expiry }}</td>
+                        <td>{{ opt.dte }}</td>
+                        <td>${{ opt.strike }}</td>
+                        <td class="otm-pct">{{ opt.otm_pct }}%</td>
+                        <td>{% if opt.bid %}${{ opt.bid }}{% else %}&mdash;{% endif %}</td>
+                        <td>{% if opt.ask %}${{ opt.ask }}{% else %}&mdash;{% endif %}</td>
+                        <td>{{ opt.delta }}</td>
+                        <td>{% if opt.iv %}{{ opt.iv }}%{% else %}&mdash;{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </details>
 </div>
