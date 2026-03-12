@@ -5,12 +5,27 @@ from datetime import date
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
+import yfinance as yf
+
 from screener.models import IV30Snapshot, Symbol
 from screener.services import yfinance_svc
 from screener.services.yfinance_svc import NoOptionsError, YFinanceError
 from screener.services.rate_limit import call_with_backoff
 
 logger = logging.getLogger(__name__)
+
+
+def _market_was_open_today() -> bool:
+    """Check if the US market was open today by fetching SPY's latest trading day."""
+    try:
+        hist = yf.Ticker("SPY").history(period="1d")
+        if hist.empty:
+            return False
+        return hist.index[0].date() == date.today()
+    except Exception:
+        logger.exception("Failed to check market status, assuming open")
+        return True
+
 
 class Command(BaseCommand):
     help = "Pull IV30 from yfinance options chains for all symbols"
@@ -27,6 +42,10 @@ class Command(BaseCommand):
         limit = options["limit"]
         delay = settings.YFINANCE_REQUEST_DELAY
         today = date.today()
+
+        if not _market_was_open_today():
+            self.stdout.write("Market was closed today, skipping IV pull")
+            return
 
         # Skip symbols already computed today
         already_done = set(

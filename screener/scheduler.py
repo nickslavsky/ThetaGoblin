@@ -27,10 +27,10 @@ def start():
         replace_existing=True,
     )
 
-    # IV refresh + rank computation: daily at 5 PM ET (after options close at 4:15)
+    # IV refresh + rank computation: weekdays at 5 PM ET (after options close at 4:15)
     scheduler.add_job(
         lambda: call_command("run_iv_pipeline"),
-        trigger=CronTrigger(hour=17, minute=0, timezone="America/New_York"),
+        trigger=CronTrigger(day_of_week="mon-fri", hour=17, minute=0, timezone="America/New_York"),
         id="iv_pipeline",
         replace_existing=True,
     )
@@ -38,5 +38,5 @@ def start():
     scheduler.start()
     logger.info(
         "APScheduler started: fundamentals Fri 18:00, "
-        "IV daily 17:00 ET"
+        "IV Mon-Fri 17:00 ET"
     )
