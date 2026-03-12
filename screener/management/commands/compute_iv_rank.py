@@ -19,15 +19,15 @@ class Command(BaseCommand):
 
         latest_snap = (
             IV30Snapshot.objects
-            .filter(symbol=OuterRef('pk'), date__gte=cutoff, iv30__isnull=False)
+            .filter(symbol=OuterRef('pk'), date__gte=cutoff)
             .order_by('-date')
         )
 
-        window = Q(iv30_snapshots__date__gte=cutoff, iv30_snapshots__iv30__isnull=False)
+        window = Q(iv30_snapshots__date__gte=cutoff)
 
         symbols = (
             Symbol.objects
-            .filter(iv30_snapshots__date__gte=cutoff, iv30_snapshots__iv30__isnull=False)
+            .filter(iv30_snapshots__date__gte=cutoff)
             .annotate(
                 current_iv30=Subquery(latest_snap.values('iv30')[:1]),
                 latest_date=Subquery(latest_snap.values('date')[:1]),

@@ -23,37 +23,22 @@ class RunFundamentalsPipelineTest(TestCase):
 class RunIvPipelineTest(TestCase):
 
     @patch("screener.management.commands.run_iv_pipeline.call_command")
-    def test_calls_all_steps_in_order(self, mock_call):
+    def test_calls_steps_in_order(self, mock_call):
         call_command("run_iv_pipeline")
         calls = [c[0][0] for c in mock_call.call_args_list]
-        self.assertIn("pull_iv", calls)
         self.assertIn("pull_iv_yfinance", calls)
         self.assertIn("compute_iv_rank", calls)
-        self.assertLess(calls.index("pull_iv"), calls.index("pull_iv_yfinance"))
         self.assertLess(
             calls.index("pull_iv_yfinance"), calls.index("compute_iv_rank")
         )
 
     @patch("screener.management.commands.run_iv_pipeline.call_command")
-    def test_continues_when_pull_iv_fails(self, mock_call):
-        """If pull_iv raises SystemExit, pipeline continues with yfinance and compute."""
-        mock_call.side_effect = lambda cmd, **kw: (_ for _ in ()).throw(
-            SystemExit(1)
-        ) if cmd == "pull_iv" else None
-        call_command("run_iv_pipeline")
-        calls = [c[0][0] for c in mock_call.call_args_list]
-        self.assertIn("pull_iv", calls)
-        self.assertIn("pull_iv_yfinance", calls)
-        self.assertIn("compute_iv_rank", calls)
-
-    @patch("screener.management.commands.run_iv_pipeline.call_command")
-    def test_continues_when_pull_iv_yfinance_fails(self, mock_call):
-        """If pull_iv_yfinance raises an exception, compute_iv_rank still runs."""
+    def test_aborts_when_pull_iv_yfinance_fails(self, mock_call):
+        """If pull_iv_yfinance fails, compute_iv_rank is skipped."""
         mock_call.side_effect = lambda cmd, **kw: (_ for _ in ()).throw(
             RuntimeError("yfinance error")
         ) if cmd == "pull_iv_yfinance" else None
         call_command("run_iv_pipeline")
         calls = [c[0][0] for c in mock_call.call_args_list]
-        self.assertIn("pull_iv", calls)
         self.assertIn("pull_iv_yfinance", calls)
-        self.assertIn("compute_iv_rank", calls)
+        self.assertNotIn("compute_iv_rank", calls)

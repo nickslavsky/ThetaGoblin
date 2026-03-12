@@ -30,9 +30,8 @@ class Command(BaseCommand):
 
         # Skip symbols already computed today
         already_done = set(
-            IV30Snapshot.objects.filter(
-                date=today, iv30_yfinance__isnull=False,
-            ).values_list("symbol_id", flat=True)
+            IV30Snapshot.objects.filter(date=today)
+            .values_list("symbol_id", flat=True)
         )
 
         qs = Symbol.objects.exclude(id__in=already_done).order_by("ticker")
@@ -71,7 +70,7 @@ class Command(BaseCommand):
 
             IV30Snapshot.objects.update_or_create(
                 symbol=sym, date=today,
-                defaults={"iv30_yfinance": iv30},
+                defaults={"iv30": iv30},
             )
             upserted += 1
 
