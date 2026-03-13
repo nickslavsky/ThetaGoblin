@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 # Finnhub returns at most ~1500 records per request descending from the `to` date.
 # One week of earnings stays well under that limit. Chunk all range requests by week
 # to avoid silent truncation of earlier dates.
-CHUNK_DAYS = 7
+CHUNK_DAYS = 3
 TRUNCATION_WARN_THRESHOLD = 1400
 
 
