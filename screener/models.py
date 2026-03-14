@@ -10,6 +10,10 @@ class Symbol(models.Model):
     free_cash_flow = models.FloatField(null=True, blank=True)
     debt_to_equity = models.FloatField(null=True, blank=True)
     avg_volume_10d = models.FloatField(null=True, blank=True)
+    has_options = models.BooleanField(
+        default=True,
+        help_text="False if yfinance reports no options chain — skipped in IV pulls",
+    )
     suppress_until = models.DateField(
         null=True, blank=True,
         help_text="Hide from candidates until this date (exclusive — reappears day after)",

@@ -53,7 +53,7 @@ class Command(BaseCommand):
             .values_list("symbol_id", flat=True)
         )
 
-        qs = Symbol.objects.exclude(id__in=already_done).order_by("ticker")
+        qs = Symbol.objects.filter(has_options=True).exclude(id__in=already_done).order_by("ticker")
         if limit:
             qs = qs[:limit]
 
@@ -78,7 +78,9 @@ class Command(BaseCommand):
                 )
             except NoOptionsError:
                 no_options += 1
-                logger.debug("No options data for %s, skipping", sym.ticker)
+                sym.has_options = False
+                sym.save(update_fields=["has_options"])
+                logger.debug("No options data for %s, flagged has_options=False", sym.ticker)
                 continue
 
             if iv30 is None:

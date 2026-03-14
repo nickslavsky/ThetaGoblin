@@ -35,8 +35,16 @@ def start():
         replace_existing=True,
     )
 
+    # Monthly re-check of symbols flagged has_options=False: 1st of month at 10 AM ET
+    scheduler.add_job(
+        lambda: call_command("recheck_options"),
+        trigger=CronTrigger(day=1, hour=10, minute=0, timezone="America/New_York"),
+        id="recheck_options",
+        replace_existing=True,
+    )
+
     scheduler.start()
     logger.info(
         "APScheduler started: fundamentals Fri 18:00, "
-        "IV Mon-Fri 17:00 ET"
+        "IV Mon-Fri 17:00, recheck_options 1st of month 10:00 ET"
     )
